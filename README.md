@@ -94,15 +94,15 @@ Clicks the center cell C3 first (for broad geometric coverage), then picks subse
 
 All strategies evaluated by exact simulation across all 16,800 boards, weighted by the uniform red position distribution.
 
-| Strategy | Expected score | vs Optimal | Score min | P(find red) | pkl size | Precompute |
+| Strategy | Expected score | Score std | Score min | P(find red) | pkl size | Precompute |
 |---|---|---|---|---|---|---|
-| Exact POMDP | 336.98 | — | 200 | 100% | 789 MB | ~33 min |
-| VOI Greedy (depth=3) | 336.97 | −0.01 | 200 | 100% | 16.6 MB | ~1 min |
-| VOI Greedy (depth=2) | 335.84 | −1.14 | 95 | 99.9% | 1.3 MB | 5 sec |
-| VOI Greedy (depth=1) | 328.61 | −8.37 | 70 | 99.5% | 0.1 MB | 0.2 sec |
-| Entropy Minimization | 326.52 | −10.46 | 200 | 100% | ~1 MB | ~1 sec |
-| Candidate Halving | 325.03 | −11.95 | 190 | 100% | ~1 MB | ~1 sec |
-| Baseline (center+random) | 262.01 | −74.97 | ~198 | 98% | — | None |
+| Exact POMDP | 336.98 | 58.55 | 200 | 100% | 789 MB | ~33 min |
+| VOI Greedy (depth=3) | 336.97 | 59.76 | 200 | 100% | 16.6 MB | ~1 min |
+| VOI Greedy (depth=2) | 335.84 | 58.72 | 95 | 99.9% | 1.3 MB | 5 sec |
+| VOI Greedy (depth=1) | 328.61 | 64.03 | 70 | 99.5% | 0.1 MB | 0.2 sec |
+| Entropy Minimization | 326.52 | 60.89 | 200 | 100% | ~1 MB | ~1 sec |
+| Candidate Halving | 325.03 | 65.62 | 190 | 100% | ~1 MB | ~1 sec |
+| Baseline (center+random) | 262.01 | 33.43 | 200 | 98% | — | None |
 
 ### Key Findings
 
