@@ -1,0 +1,6 @@
+/__pycache__
+/.vscode
+/plots
+/cache/*
+!/cache/voi_d3_cache.pkl
+!/cache/all_boards.npy

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SeeRed — Ourosphere Guide</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0f1117;
+    color: #e8e8e8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px;
+  }
+
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  h1 span { color: #e24b4a; }
+
+  .subtitle {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 32px;
+  }
+
+  .layout {
+    display: flex;
+    gap: 32px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+    width: 100%;
+    max-width: 900px;
+  }
+
+  /* ── Grid ── */
+  .grid-section { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+
+  .col-labels {
+    display: grid;
+    grid-template-columns: 28px repeat(5, 72px);
+    gap: 4px;
+    padding-left: 4px;
+  }
+  .col-label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    line-height: 20px;
+  }
+
+  .grid-with-rows {
+    display: flex;
+    gap: 4px;
+  }
+
+  .row-labels {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    justify-content: center;
+  }
+  .row-label {
+    width: 20px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(5, 72px);
+    gap: 4px;
+  }
+
+  .cell {
+    width: 72px;
+    height: 72px;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.1s, box-shadow 0.1s;
+    border: 2px solid transparent;
+    background: #1e2130;
+    gap: 4px;
+  }
+  .cell:hover { transform: scale(1.04); }
+  .cell.recommended {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.15);
+    background: #252a3a;
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  .cell.candidate { background: #1a2030; border-color: #2a3a55; }
+  .cell.revealed { cursor: default; }
+  .cell.revealed:hover { transform: none; }
+  .cell.center { background: #141820; cursor: default; }
+  .cell.center:hover { transform: none; }
+  .cell.normal { background: #1a1d28; }
+  .cell.done { cursor: default; }
+  .cell.done:hover { transform: none; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(255,255,255,0.15); }
+    50% { box-shadow: 0 0 0 6px rgba(255,255,255,0.25); }
+  }
+
+  .cell-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: #444;
+    line-height: 1;
+  }
+  .cell.recommended .cell-label { color: #999; }
+  .cell.candidate .cell-label { color: #3a5a8a; }
+
+  .cell-tag {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #555;
+    line-height: 1;
+  }
+  .cell.recommended .cell-tag { color: #aaa; }
+
+  /* sphere inside revealed cell */
+  .sphere {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.9);
+    position: relative;
+  }
+  .sphere::after {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 10px;
+    width: 10px;
+    height: 6px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    transform: rotate(-30deg);
+  }
+
+  .color-0 { background: radial-gradient(circle at 35% 35%, #5a9fd4, #1a5a9a); }  /* blue */
+  .color-1 { background: radial-gradient(circle at 35% 35%, #3dcba8, #0a6e56); }  /* teal */
+  .color-2 { background: radial-gradient(circle at 35% 35%, #7ec44a, #3a6d11); }  /* green */
+  .color-3 { background: radial-gradient(circle at 35% 35%, #e8d050, #9a7a10); }  /* yellow */
+  .color-4 { background: radial-gradient(circle at 35% 35%, #f4a030, #c06010); }  /* orange */
+  .color-5 { background: radial-gradient(circle at 35% 35%, #f06060, #a02020); }  /* red */
+
+  /* ── Side panel ── */
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 260px;
+    flex-shrink: 0;
+  }
+
+  .card {
+    background: #1a1d28;
+    border-radius: 12px;
+    padding: 16px;
+    border: 1px solid #252836;
+  }
+  .card-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #555;
+    margin-bottom: 10px;
+  }
+
+  /* stats row */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+  .stat {
+    background: #13151f;
+    border-radius: 8px;
+    padding: 10px 8px;
+    text-align: center;
+  }
+  .stat-value { font-size: 22px; font-weight: 700; color: #fff; line-height: 1; }
+  .stat-label { font-size: 10px; color: #555; margin-top: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* recommendation */
+  .rec-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #13151f;
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid #2a2d3e;
+  }
+  .rec-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #252a3a;
+    border: 2px solid #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    flex-shrink: 0;
+  }
+  .rec-text { flex: 1; }
+  .rec-name { font-size: 18px; font-weight: 700; color: #fff; }
+  .rec-sub { font-size: 12px; color: #555; margin-top: 2px; }
+
+  /* color picker */
+  .color-picker {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+  }
+  .color-btn {
+    padding: 8px 4px;
+    border-radius: 8px;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    background: #13151f;
+    transition: border-color 0.1s, transform 0.1s;
+  }
+  .color-btn:hover { transform: scale(1.03); }
+  .color-btn.selected { border-color: #fff; }
+  .color-dot {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+  }
+  .color-name { font-size: 10px; color: #666; font-weight: 600; text-transform: capitalize; }
+  .color-pts { font-size: 9px; color: #444; }
+
+  .submit-btn {
+    width: 100%;
+    padding: 11px;
+    border-radius: 8px;
+    border: none;
+    background: #2a3a5a;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.1s;
+    margin-top: 4px;
+  }
+  .submit-btn:hover { background: #3a4a7a; }
+  .submit-btn:disabled { background: #1a1d28; color: #444; cursor: default; }
+
+  .reset-btn {
+    width: 100%;
+    padding: 9px;
+    border-radius: 8px;
+    border: 1px solid #2a2d3e;
+    background: transparent;
+    color: #666;
+    font-size: 13px;
+    cursor: pointer;
+    transition: color 0.1s, border-color 0.1s;
+  }
+  .reset-btn:hover { color: #aaa; border-color: #444; }
+
+  /* history */
+  .history-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #1e2130;
+  }
+  .history-row:last-child { border-bottom: none; }
+  .history-num {
+    font-size: 11px;
+    color: #444;
+    width: 16px;
+    text-align: center;
+  }
+  .history-sphere {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .history-cell { font-size: 13px; font-weight: 600; color: #ccc; flex: 1; }
+  .history-pts { font-size: 12px; color: #666; }
+
+  /* done overlay */
+  .done-card {
+    background: #1a1d28;
+    border-radius: 12px;
+    padding: 20px;
+    border: 1px solid #2a3a5a;
+    text-align: center;
+  }
+  .done-score { font-size: 48px; font-weight: 800; color: #fff; line-height: 1; }
+  .done-label { font-size: 13px; color: #555; margin-top: 4px; margin-bottom: 16px; }
+  .done-bar {
+    height: 8px;
+    background: #13151f;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .done-fill { height: 100%; border-radius: 4px; background: linear-gradient(90deg, #1D9E75, #7ec44a); transition: width 0.6s ease; }
+  .done-pct { font-size: 12px; color: #555; }
+
+  /* connection status */
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+  }
+  .status-dot.ok { background: #3dcba8; }
+  .status-dot.err { background: #e24b4a; }
+  .status-text { font-size: 12px; color: #555; }
+
+  /* pending click highlight */
+  .cell.pending { border-color: #f4a030; background: #251f14; }
+
+  .no-history { font-size: 12px; color: #444; text-align: center; padding: 8px 0; }
+</style>
+</head>
+<body>
+
+<h1>See<span>Red</span></h1>
+<p class="subtitle">POMDP-guided Ourosphere assistant — make the same move in-game, enter the result here</p>
+
+<div class="layout">
+
+  <!-- Grid -->
+  <div class="grid-section">
+    <div class="col-labels">
+      <div></div>
+      <div class="col-label">A</div>
+      <div class="col-label">B</div>
+      <div class="col-label">C</div>
+      <div class="col-label">D</div>
+      <div class="col-label">E</div>
+    </div>
+    <div class="grid-with-rows">
+      <div class="row-labels" id="rowLabels">
+        <div class="row-label">1</div>
+        <div class="row-label">2</div>
+        <div class="row-label">3</div>
+        <div class="row-label">4</div>
+        <div class="row-label">5</div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </div>
+    <div>
+      <span class="status-dot ok" id="statusDot"></span>
+      <span class="status-text" id="statusText">Connecting...</span>
+    </div>
+  </div>
+
+  <!-- Panel -->
+  <div class="panel">
+
+    <!-- Stats -->
+    <div class="card">
+      <div class="card-title">Status</div>
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="statClicks">5</div>
+          <div class="stat-label">Clicks left</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="statScore">0</div>
+          <div class="stat-label">Score</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="statCands">24</div>
+          <div class="stat-label">Candidates</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommendation -->
+    <div class="card" id="recCard">
+      <div class="card-title">Next click</div>
+      <div class="rec-cell">
+        <div class="rec-circle" id="recCircle">—</div>
+        <div class="rec-text">
+          <div class="rec-name" id="recName">Loading...</div>
+          <div class="rec-sub" id="recSub">Waiting for policy server</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Color input -->
+    <div class="card" id="inputCard">
+      <div class="card-title">What did you reveal?</div>
+      <div class="color-picker" id="colorPicker"></div>
+      <button class="submit-btn" id="submitBtn" disabled onclick="submitReveal()">Submit reveal</button>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-title">Click history</div>
+      <div id="history"><div class="no-history">No clicks yet</div></div>
+    </div>
+
+    <!-- Done -->
+    <div class="card done-card" id="doneCard" style="display:none">
+      <div class="done-score" id="doneScore">0</div>
+      <div class="done-label">Final score</div>
+      <div class="done-bar"><div class="done-fill" id="doneFill" style="width:0%"></div></div>
+      <div class="done-pct" id="donePct">0% of maximum (440)</div>
+      <button class="reset-btn" style="margin-top:12px" onclick="reset()">New game</button>
+    </div>
+
+    <button class="reset-btn" id="resetBtn" onclick="reset()">Reset game</button>
+
+  </div>
+</div>
+
+<script>
+const API    = 'http://localhost:7734';
+const COLS   = ['A','B','C','D','E'];
+const COLORS = [
+  { name: 'Blue',   pts: 10,  hex: '#1a5a9a' },
+  { name: 'Teal',   pts: 20,  hex: '#0a6e56' },
+  { name: 'Green',  pts: 35,  hex: '#3a6d11' },
+  { name: 'Yellow', pts: 55,  hex: '#9a7a10' },
+  { name: 'Orange', pts: 90,  hex: '#c06010' },
+  { name: 'Red',    pts: 150, hex: '#a02020' },
+];
+
+let state         = null;
+let pendingCell   = null;
+let selectedColor = null;
+
+// ── build color picker ────────────────────────────────────────────────────────
+const picker = document.getElementById('colorPicker');
+COLORS.forEach((c, i) => {
+  const btn = document.createElement('div');
+  btn.className = 'color-btn';
+  btn.dataset.color = i;
+  btn.innerHTML = `
+    <div class="color-dot" style="background:${c.hex}"></div>
+    <div class="color-name">${c.name}</div>
+    <div class="color-pts">+${c.pts}</div>
+  `;
+  btn.onclick = () => selectColor(i);
+  picker.appendChild(btn);
+});
+
+function selectColor(i) {
+  selectedColor = i;
+  document.querySelectorAll('.color-btn').forEach((b, idx) => {
+    b.classList.toggle('selected', idx === i);
+  });
+  document.getElementById('submitBtn').disabled =
+    (pendingCell === null || selectedColor === null || (state && state.done));
+}
+
+// ── grid ──────────────────────────────────────────────────────────────────────
+function buildGrid(cells) {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  cells.forEach(c => {
+    const div = document.createElement('div');
+    const row = Math.floor(c.index / 5) + 1;
+    const col = COLS[c.index % 5];
+    const label = `${col}${row}`;
+
+    div.className = `cell ${c.state}`;
+    div.dataset.index = c.index;
+
+    if (c.state === 'revealed') {
+      div.innerHTML = `
+        <div class="sphere color-${c.color}">+${COLORS[c.color].pts}</div>
+        <div class="cell-label">${label}</div>
+      `;
+    } else if (c.state === 'center') {
+      div.innerHTML = `<div class="cell-label">${label}</div><div class="cell-tag">no red</div>`;
+    } else if (c.state === 'recommended') {
+      div.innerHTML = `<div class="cell-label">${label}</div><div class="cell-tag">click this</div>`;
+      div.onclick = () => selectCell(c.index);
+    } else if (c.state === 'candidate') {
+      div.innerHTML = `<div class="cell-label">${label}</div><div class="cell-tag">candidate</div>`;
+      div.onclick = () => selectCell(c.index);
+    } else {
+      div.innerHTML = `<div class="cell-label">${label}</div>`;
+      div.onclick = () => selectCell(c.index);
+    }
+
+    if (c.index === pendingCell) div.classList.add('pending');
+    grid.appendChild(div);
+  });
+}
+
+function selectCell(idx) {
+  if (!state || state.done) return;
+  const already = state.history.map(h => h.cell);
+  if (already.includes(idx)) return;
+  pendingCell = idx;
+  buildGrid(state.cells);
+  // highlight pending
+  const el = document.querySelector(`.cell[data-index="${idx}"]`);
+  if (el) el.classList.add('pending');
+  document.getElementById('submitBtn').disabled =
+    (selectedColor === null || state.done);
+}
+
+// ── render state ──────────────────────────────────────────────────────────────
+function render(s) {
+  state = s;
+  buildGrid(s.cells);
+
+  document.getElementById('statClicks').textContent = s.clicks_left;
+  document.getElementById('statScore').textContent  = s.score;
+  document.getElementById('statCands').textContent  = s.candidate_count;
+
+  // recommendation
+  if (!s.done && s.recommended !== null) {
+    const row = Math.floor(s.recommended / 5) + 1;
+    const col = COLS[s.recommended % 5];
+    document.getElementById('recCircle').textContent = `${col}${row}`;
+    document.getElementById('recName').textContent   = `Click ${col}${row}`;
+    document.getElementById('recSub').textContent    =
+      `${s.candidate_count} red candidate${s.candidate_count !== 1 ? 's' : ''} · ${s.consistent_boards.toLocaleString()} consistent boards`;
+  } else if (s.done) {
+    document.getElementById('recName').textContent = 'Round complete';
+    document.getElementById('recSub').textContent  = `Final score: ${s.score}`;
+    document.getElementById('recCircle').textContent = '✓';
+  }
+
+  // history
+  const hist = document.getElementById('history');
+  if (s.history.length === 0) {
+    hist.innerHTML = '<div class="no-history">No clicks yet</div>';
+  } else {
+    hist.innerHTML = s.history.map((h, i) => {
+      const row = Math.floor(h.cell / 5) + 1;
+      const col = COLS[h.cell % 5];
+      return `<div class="history-row">
+        <div class="history-num">${i+1}</div>
+        <div class="history-sphere color-${h.color}" style="background:${COLORS[h.color].hex};border-radius:50%;width:24px;height:24px;flex-shrink:0;"></div>
+        <div class="history-cell">${col}${row} — ${h.color_name}</div>
+        <div class="history-pts">+${h.reward}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // done
+  if (s.done) {
+    document.getElementById('doneCard').style.display = 'block';
+    document.getElementById('resetBtn').style.display = 'none';
+    document.getElementById('inputCard').style.display = 'none';
+    document.getElementById('recCard').style.display = 'none';
+    document.getElementById('doneScore').textContent = s.score;
+    const pct = Math.round(s.score / 440 * 100);
+    document.getElementById('doneFill').style.width = pct + '%';
+    document.getElementById('donePct').textContent = `${pct}% of maximum (440)`;
+  } else {
+    document.getElementById('doneCard').style.display = 'none';
+    document.getElementById('resetBtn').style.display = 'block';
+    document.getElementById('inputCard').style.display = 'block';
+    document.getElementById('recCard').style.display = 'block';
+  }
+}
+
+// ── API calls ─────────────────────────────────────────────────────────────────
+async function fetchState() {
+  try {
+    const r = await fetch(`${API}/state`);
+    const s = await r.json();
+    render(s);
+    setStatus(true);
+  } catch {
+    setStatus(false);
+  }
+}
+
+async function submitReveal() {
+  if (pendingCell === null || selectedColor === null) return;
+  try {
+    const r = await fetch(`${API}/reveal`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cell: pendingCell, color: selectedColor }),
+    });
+    const s = await r.json();
+    pendingCell   = null;
+    selectedColor = null;
+    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('submitBtn').disabled = true;
+    render(s);
+  } catch (e) {
+    alert('Could not reach server. Is server.py running?');
+  }
+}
+
+async function reset() {
+  pendingCell   = null;
+  selectedColor = null;
+  document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('submitBtn').disabled = true;
+  try {
+    const r = await fetch(`${API}/reset`, { method: 'POST' });
+    const s = await r.json();
+    render(s);
+  } catch {
+    setStatus(false);
+  }
+}
+
+function setStatus(ok) {
+  document.getElementById('statusDot').className = `status-dot ${ok ? 'ok' : 'err'}`;
+  document.getElementById('statusText').textContent = ok
+    ? 'Connected to policy server'
+    : 'Cannot reach server — run: python server.py';
+}
+
+// ── init ──────────────────────────────────────────────────────────────────────
+fetchState();
+setInterval(fetchState, 5000); // reconnect poll
+</script>
+</body>
+</html>
