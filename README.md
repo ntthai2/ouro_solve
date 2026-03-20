@@ -64,7 +64,33 @@ This was verified empirically via chi-square test on 46 observed game outcomes (
 
 ---
 
-## 4. Strategy Analysis
+## 4. Strategy Descriptions
+
+Each strategy takes the same input — the current belief state (set of boards still consistent with revealed colors) — and decides which cell to click next. They differ in how deeply they reason about future clicks and what objective they optimize.
+
+### Exact POMDP
+
+Solves the game optimally by computing the full value function via backward induction over all possible belief states and click sequences. At each decision point it asks: *"For every cell I could click, what is the expected total score I will accumulate over all remaining clicks, averaging over every board still consistent with what I've seen?"* It picks the cell that maximizes this quantity exactly. Because it reasons over all 5 clicks simultaneously, it can make a low-immediate-value click early if that click yields information that enables much higher-value clicks later. The policy memo table contains 394,735 states and requires ~33 minutes to precompute. This is the theoretical ceiling against which all other strategies are benchmarked.
+
+### VOI Greedy (depth=1 / 2 / 3 / 5)
+
+Value of Information (VOI) greedy generalizes one-step greedy by looking ahead a fixed number of clicks before making a decision. At depth *d*, it evaluates every sequence of *d* clicks, computes the expected score over that horizon, and picks the first click of the best sequence. Depth 1 is pure one-step greedy — pick the cell with the highest immediate expected reward. Depth 5 covers all remaining clicks and is mathematically equivalent to the full POMDP; this was confirmed empirically (identical expected scores to 6 decimal places, identical memo tables). The practical tradeoff is between memo table size and solution quality: depth 3 achieves near-POMDP performance (−0.01 pts) at 16.6 MB, while depth 2 is much cheaper but occasionally makes early decisions that collapse the score floor to 95.
+
+### Entropy Minimization
+
+A purely information-theoretic strategy. Rather than maximizing expected score directly, it selects the cell whose reveal is expected to reduce uncertainty about red's location the most — formally, the cell that minimizes the expected Shannon entropy of the remaining candidate set. It never looks at point values at all; it treats every click as a question whose answer should be maximally informative. Despite this simplicity, it performs well (326.52 expected score, 97% of optimal) because finding red early is the dominant driver of score. It always finds red within 5 clicks and has a clean score floor of 200.
+
+### Candidate Halving
+
+A coarser information-based heuristic. At each step it selects the cell that minimizes the *expected number of remaining red candidates* after the reveal — equivalently, it tries to cut the candidate set in half as fast as possible. Like entropy minimization it ignores point values entirely, but it uses a simpler objective (expected candidate count rather than entropy). Performance is slightly below entropy minimization (325.03 vs 326.52) but it is the easiest strategy to approximate mentally, and its opening move (B2) independently matches the human expert strategy documented outside this project.
+
+### Baseline (center + random)
+
+Clicks the center cell C3 first (for broad geometric coverage), then picks subsequent cells uniformly at random from unclicked cells — with no deduction, no information use, and no optimization. Included as a lower bound to quantify the value of any informed strategy. It scores 262 on average and finds red 98% of the time.
+
+---
+
+## 5. Strategy Analysis
 
 All strategies evaluated by exact simulation across all 16,800 boards, weighted by the uniform red position distribution.
 
@@ -106,7 +132,7 @@ The depth=3 → depth=4 jump would yield at most ~0.01 additional points based o
 
 ---
 
-## 5. Optimal First Click
+## 6. Optimal First Click
 
 The optimal first click — determined by POMDP and confirmed by VOI depth=5 — is **cell B1 (row 1, column B)**, not the center cell C3.
 
@@ -128,7 +154,7 @@ Notably, the human-designed strategy documented independently by a player uses B
 
 ---
 
-## 6. Practical Recommendations
+## 7. Practical Recommendations
 
 ### For Maximum Score (Automated / Bot)
 
@@ -150,7 +176,7 @@ Center-first with random subsequent picks loses 75 points per game vs optimal. T
 
 ---
 
-## 7. SeeRed Live Assistant
+## 8. SeeRed Live Assistant
 
 SeeRed is a browser-based assistant that drives the VOI d=3 policy in real time. You mirror your in-game clicks on the visual grid, enter the revealed color, and the assistant recommends the next optimal cell.
 
@@ -166,7 +192,7 @@ To switch strategy, edit `POLICY_CACHE` and `POLICY_DEPTH` at the top of `server
 
 ---
 
-## 8. Technical Notes
+## 9. Technical Notes
 
 ### POMDP Formulation
 
