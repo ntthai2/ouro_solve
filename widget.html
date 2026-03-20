@@ -455,7 +455,9 @@
 </div>
 
 <script>
-const API    = 'http://localhost:7734';
+const API    = window.location.origin === 'null'
+               ? 'http://localhost:7734'   // opened as local file
+               : '';                        // hosted — same origin
 const COLS   = ['A','B','C','D','E'];
 const COLORS = [
   { name: 'Blue',   pts: 10,  hex: '#1a5a9a' },
