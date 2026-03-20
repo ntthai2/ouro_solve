@@ -19,7 +19,6 @@ Color encoding (int for speed):
 from itertools import combinations
 from typing import List, Tuple
 import numpy as np
-import torch
 
 # ── constants ────────────────────────────────────────────────────────────────
 
@@ -185,8 +184,9 @@ def compute_board_weights(boards: np.ndarray) -> np.ndarray:
     return raw_weights / raw_weights.sum()
 
 
-def boards_to_tensor(boards: np.ndarray, device='cuda') -> torch.Tensor:
+def boards_to_tensor(boards: np.ndarray, device='cuda'):
     """Convert boards numpy array to torch tensor on device."""
+    import torch
     return torch.tensor(boards, dtype=torch.uint8, device=device)
 
 
