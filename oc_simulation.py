@@ -16,12 +16,12 @@ from typing import List, Dict, Any
 import numpy as np
 import pandas as pd
 
-from board_generator import (
+from oc_board_generator import (
     NUM_CELLS, CENTER, COLOR_NAMES, COLOR_VALUES,
     COLOR_RED, compute_board_weights,
 )
-from belief_state import LightBeliefState, FullBeliefState
-from strategies import (
+from oc_belief_state import LightBeliefState, FullBeliefState
+from oc_strategies import (
     BaselineCenterRandom, ExactPOMDP, VOIGreedy,
     EntropyMinimization, CandidateHalving,
 )

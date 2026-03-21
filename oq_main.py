@@ -13,10 +13,10 @@ import time
 import pickle
 import numpy as np
 
-from board_generator_oq import enumerate_boards
-from belief_state_oq import OQFullBeliefState
-from strategies_oq import OQVOIGreedy, OQPurpleFirstGreedy
-from simulation_oq import run_simulation_oq
+from oq_board_generator import enumerate_boards
+from oq_belief_state import OQFullBeliefState
+from oq_strategies import OQVOIGreedy, OQPurpleFirstGreedy
+from oq_simulation import run_simulation_oq
 
 CACHE_DIR = "cache"
 BOARDS_CACHE = "cache/all_boards_oq.npy"

@@ -19,11 +19,11 @@ import random
 from functools import lru_cache
 from typing import Dict, Tuple, FrozenSet
 
-from board_generator import (
+from oc_board_generator import (
     NUM_CELLS, CENTER, COLOR_NAMES, COLOR_VALUES,
     COLOR_RED, COLOR_ORANGE, COLOR_YELLOW, COLOR_GREEN, COLOR_TEAL, COLOR_BLUE,
 )
-from belief_state import LightBeliefState, FullBeliefState, _red_candidates_after_reveal
+from oc_belief_state import LightBeliefState, FullBeliefState, _red_candidates_after_reveal
 
 import numpy as np
 

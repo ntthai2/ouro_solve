@@ -18,7 +18,7 @@ from __future__ import annotations
 from typing import FrozenSet, List
 import numpy as np
 
-from board_generator_oq import (
+from oq_board_generator import (
     NUM_CELLS,
     COLOR_VALUES,
     COLOR_PURPLE,

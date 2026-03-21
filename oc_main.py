@@ -13,11 +13,11 @@ import time
 import pickle
 import numpy as np
 
-from board_generator import enumerate_boards, compute_board_weights
-from belief_state import FullBeliefState
-from strategies import ExactPOMDP, VOIGreedy, EntropyMinimization, CandidateHalving
-from simulation import run_simulation, compute_summary, compute_by_center_color
-from analysis import run_analysis
+from oc_board_generator import enumerate_boards, compute_board_weights
+from oc_belief_state import FullBeliefState
+from oc_strategies import ExactPOMDP, VOIGreedy, EntropyMinimization, CandidateHalving
+from oc_simulation import run_simulation, compute_summary, compute_by_center_color
+from oc_analysis import run_analysis
 
 CACHE_DIR     = 'cache'
 BOARDS_CACHE  = f'{CACHE_DIR}/all_boards.npy'

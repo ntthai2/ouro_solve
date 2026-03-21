@@ -19,14 +19,14 @@ from typing import Any, Dict, Iterable, List
 import numpy as np
 import pandas as pd
 
-from board_generator_oq import (
+from oq_board_generator import (
     NUM_CELLS,
     COLOR_VALUES,
     COLOR_PURPLE,
     COLOR_RED,
     get_purple_positions,
 )
-from belief_state_oq import OQFullBeliefState
+from oq_belief_state import OQFullBeliefState
 
 try:
     from tqdm import tqdm  # type: ignore
