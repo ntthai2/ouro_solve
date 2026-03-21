@@ -107,21 +107,21 @@ def main():
     initial_belief = FullBeliefState()
 
     # step 2 — POMDP
-    # if _cache_ok(POMDP_CACHE):
-    #     print(f"\nLoading POMDP from cache...")
-    #     pomdp = _load_pomdp(POMDP_CACHE)
-    #     print(f"  Memo table: {len(pomdp._value_memo):,} states")
-    # else:
-    #     print("\nPrecomputing POMDP (~33 min)...")
-    #     pomdp = ExactPOMDP()
-    #     t0 = time.time()
-    #     pomdp.precompute(initial_belief, max_clicks=5)
-    #     print(f"  Done in {time.time()-t0:.1f}s")
-    #     _save(pomdp, POMDP_CACHE)
-    # print(f"  Expected score: {pomdp.value(initial_belief, 5):.4f}")
-    # print(f"  First click: cell {pomdp(initial_belief, 5)}")
+    if _cache_ok(POMDP_CACHE):
+        print(f"\nLoading POMDP from cache...")
+        pomdp = _load_pomdp(POMDP_CACHE)
+        print(f"  Memo table: {len(pomdp._value_memo):,} states")
+    else:
+        print("\nPrecomputing POMDP (~33 min)...")
+        pomdp = ExactPOMDP()
+        t0 = time.time()
+        pomdp.precompute(initial_belief, max_clicks=5)
+        print(f"  Done in {time.time()-t0:.1f}s")
+        _save(pomdp, POMDP_CACHE)
+    print(f"  Expected score: {pomdp.value(initial_belief, 5):.4f}")
+    print(f"  First click: cell {pomdp(initial_belief, 5)}")
 
-    # step 3 — VOI depths 1–4
+    # step 3 — VOI depths 1–3
     voi_strategies = []
     for d in VOI_DEPTHS:
         cache_path = f'{CACHE_DIR}/voi_d{d}_cache.pkl'
@@ -164,14 +164,14 @@ def main():
         t0 = time.time()
         halving.precompute(initial_belief, max_clicks=5)
         print(f"  Done in {time.time()-t0:.1f}s")
-        _save(halving, ENTROPY_CACHE)
+        _save(halving, HALVING_CACHE)
     print(f"  First click: cell {halving(initial_belief, 5)}")
 
     # step 6 — simulate
     print("\nRunning simulation across all boards...")
     df = run_simulation(
         all_boards,
-        # pomdp_strategy=pomdp,
+        pomdp_strategy=pomdp,
         voi_strategies=voi_strategies,
         entropy_strategy=entropy,
         halving_strategy=halving,
