@@ -4,7 +4,7 @@
 
 ---
 
-# $oc — Ourosphere C Analysis
+# $oc — Ourochest Analysis
 
 > Exhaustive evaluation of 16,800 valid board configurations under uniform red position distribution.
 
@@ -200,7 +200,7 @@ To switch strategy, edit `POLICY_CACHE` and `POLICY_DEPTH` at the top of `server
 
 ---
 
-# $oq — Ourosphere Q Analysis
+# $oq — Ouroquest Analysis
 
 > Evaluation of 12,650 valid board configurations under uniform purple placement distribution.
 
@@ -276,7 +276,7 @@ The production strategy. VOI d=2 precomputes a 147-state policy memo covering ea
 
 - For each unclicked cell, compute expected immediate reward across all consistent boards
 - Purple reveals get an augmented value: `5 + cascade_bonus(purples_found)` where:
-  - 0 purples found → bonus = 40
+  - 0 purples found → bonus = 80
   - 1 purple found → bonus = 75
   - 2 purples found → bonus = 150 (next purple triggers red)
 - Non-purple reveals use standard expected color value
@@ -299,13 +299,13 @@ All strategies evaluated by exact simulation across all 12,650 boards under unif
 
 | Strategy | Expected score | Score std | Score min | Score max | P(find red) | Precompute |
 |---|---|---|---|---|---|---|
-| VOI Greedy (depth=2) | 346.41 | 60.29 | 130 | 490 | 92% | 30 sec |
+| VOI Greedy (depth=2) | 347.93 | 58.03 | 130 | 490 | 93% | 30 sec |
 | VOI Greedy (depth=1) | 345.51 | 61.02 | 140 | 490 | 91% | 1.2 sec |
 | Purple-first greedy | 295.94 | 76.15 | 80 | 490 | 81% | None |
 
 ### Key Findings
 
-**VOI d=2 is the production strategy.** At 30 seconds precompute and 1.0 MB cache, d=2 achieves 92% P(find red) and 346 mean score. The 147-state memo covers critical early decisions; the cascade bonus fallback handles the rest efficiently.
+**VOI d=2 is the production strategy.** At 30 seconds precompute and 1.0 MB cache, d=2 achieves 93% P(find red) and 348 mean score. The 147-state memo covers critical early decisions; the cascade bonus fallback handles the rest efficiently.
 
 **VOI d=1 is nearly identical in quality.** Only 0.9 points and 1% P(find red) behind d=2, with instant precompute. Chosen as fallback if cache size matters.
 

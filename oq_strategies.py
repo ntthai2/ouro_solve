@@ -60,8 +60,8 @@ def _purple_cascade_bonus(purples_found: int) -> float:
     if purples_found == 2:
         return 150.0
     if purples_found == 1:
-        return 75.0
-    return 40.0
+        return 125.0    # was 75
+    return 80.0     # was 40
 
 
 # -----------------------------------------------------------------------------

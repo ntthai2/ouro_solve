@@ -20,7 +20,7 @@ from oq_simulation import run_simulation_oq
 
 CACHE_DIR = "cache"
 BOARDS_CACHE = "cache/all_boards_oq.npy"
-VOI_DEPTHS = [1, 2]
+VOI_DEPTHS = [2]
 CACHE_VERSION = 1
 
 
@@ -100,11 +100,11 @@ def main():
         voi_strategies.append(voi)
 
     # step 2b -- purple-first greedy (no precompute needed)
-    print("\nUsing purple-first greedy strategy (no precompute)...")
-    purple_first = OQPurpleFirstGreedy()
-    first_cell = purple_first(initial_belief, 7, first_click=True)
-    print(f"  First click: cell {first_cell}")
-    voi_strategies.append(purple_first)
+    # print("\nUsing purple-first greedy strategy (no precompute)...")
+    # purple_first = OQPurpleFirstGreedy()
+    # first_cell = purple_first(initial_belief, 7, first_click=True)
+    # print(f"  First click: cell {first_cell}")
+    # voi_strategies.append(purple_first)
 
     # step 3 -- simulation
     print("\nRunning OQ simulation across all boards...")
