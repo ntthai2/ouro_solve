@@ -199,7 +199,29 @@ class OQGame:
                 "paid_click": True,
                 "converted_red": True,
             })
-            self.done = True
+            if self.paid_clicks_left == 0:
+                self.done = True
+            return
+
+        if color == COLOR_RED:
+            if self.purples_found != 3:
+                return
+            reward = int(OQ_COLOR_VALUES[COLOR_RED])
+            self.score += reward
+            self.paid_clicks_left -= 1
+            self.red_found = True
+            self.conversion_cell = cell
+            self.belief = self.belief.update(cell, COLOR_PURPLE)
+            self.history.append({
+                "cell": cell,
+                "color": COLOR_RED,
+                "color_name": OQ_COLOR_NAMES[COLOR_RED],
+                "reward": reward,
+                "paid_click": True,
+                "converted_red": True,
+            })
+            if self.paid_clicks_left == 0:
+                self.done = True
             return
 
         if color == COLOR_PURPLE:
@@ -367,6 +389,9 @@ class Handler(BaseHTTPRequestHandler):
             color = int(body.get("color", -1))
             if cell < 0 or cell >= num_cells or color < 0 or color > max_color:
                 self._send_json({"error": "invalid cell or color"}, 400)
+                return
+            if mode == "oq" and color == COLOR_RED and game.purples_found != 3:
+                self._send_json({"error": "red can only be revealed after 3 purples"}, 400)
                 return
             if cell in {h["cell"] for h in game.history}:
                 self._send_json({"error": "cell already revealed"}, 400)

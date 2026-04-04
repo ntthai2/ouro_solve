@@ -342,6 +342,10 @@
 
   .color-btn:hover { transform: scale(1.03); }
   .color-btn.selected { border-color: #fff; }
+  .color-btn.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
   .color-dot {
     width: 24px;
@@ -558,6 +562,7 @@ const OQ_COLORS = [
   { id: 3, name: 'Yellow', pts: 55, hex: '#9a7a10' },
   { id: 4, name: 'Orange', pts: 90, hex: '#c06010' },
   { id: 5, name: 'Purple', pts: 5, hex: '#7a46c6' },
+  { id: 6, name: 'Red', pts: 150, hex: '#a02020' },
 ];
 
 let currentMode = 'oc';
@@ -585,15 +590,18 @@ function buildColorPicker() {
   picker.innerHTML = '';
 
   colorsForMode().forEach((c) => {
+    const disabled = currentMode === 'oq' && c.id === 6 && (!state || state.purples_found < 3);
     const btn = document.createElement('div');
-    btn.className = 'color-btn';
+    btn.className = `color-btn${disabled ? ' disabled' : ''}`;
     btn.dataset.color = c.id;
     btn.innerHTML = `
       <div class="color-dot" style="background:${c.hex}"></div>
       <div class="color-name">${c.name}</div>
       <div class="color-pts">+${c.pts}${currentMode === 'oq' && c.id === 5 ? ' (Free)' : ''}</div>
     `;
-    btn.onclick = () => selectColor(c.id);
+    if (!disabled) {
+      btn.onclick = () => selectColor(c.id);
+    }
     picker.appendChild(btn);
   });
 }
@@ -688,6 +696,13 @@ function renderRecommendation(s) {
     document.getElementById('recCircle').textContent = coord;
     document.getElementById('recName').textContent = `⚡ Red appears at ${coord}!`;
     document.getElementById('recSub').textContent = `⚡ Red appears at ${coord}! Click it!`;
+    return;
+  }
+
+  if (!s.done && currentMode === 'oq' && s.purples_found === 3 && s.conversion_cell === null) {
+    document.getElementById('recCircle').textContent = '?';
+    document.getElementById('recName').textContent = 'Red is now on screen';
+    document.getElementById('recSub').textContent = 'Click the red cell and submit Red.';
     return;
   }
 
