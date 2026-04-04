@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import FrozenSet, Dict, List
 import numpy as np
 
-from oc_board_generator import (
+from oc.board_generator import (
     NUM_CELLS, CENTER, COLOR_NAMES, COLOR_VALUES,
     COLOR_RED, COLOR_ORANGE, COLOR_YELLOW, COLOR_GREEN, COLOR_TEAL, COLOR_BLUE,
     rc, immediate_neighbors, full_diagonal_cells, same_row_col_cells,

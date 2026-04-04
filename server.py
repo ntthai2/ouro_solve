@@ -19,25 +19,25 @@ import numpy as np
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-from oc_board_generator import (
+from oc.board_generator import (
     compute_board_weights,
     COLOR_NAMES as OC_COLOR_NAMES,
     COLOR_VALUES as OC_COLOR_VALUES,
     NUM_CELLS as OC_NUM_CELLS,
     CENTER as OC_CENTER,
 )
-from oc_belief_state import FullBeliefState as OCFullBeliefState
-from oc_strategies import VOIGreedy
+from oc.belief_state import FullBeliefState as OCFullBeliefState
+from oc.strategies import VOIGreedy
 
-from oq_board_generator import (
+from oq.board_generator import (
     NUM_CELLS as OQ_NUM_CELLS,
     COLOR_NAMES as OQ_COLOR_NAMES,
     COLOR_VALUES as OQ_COLOR_VALUES,
     COLOR_PURPLE,
     COLOR_RED,
 )
-from oq_belief_state import OQFullBeliefState
-from oq_strategies import OQVOIGreedy
+from oq.belief_state import OQFullBeliefState
+from oq.strategies import OQVOIGreedy
 
 MAX_CLICKS = 5
 PORT = int(os.environ.get("PORT", 7734))

@@ -19,13 +19,13 @@ OQ mechanics encoded here:
 from __future__ import annotations
 from typing import Dict, Tuple, FrozenSet
 
-from oq_board_generator import (
+from oq.board_generator import (
     NUM_CELLS,
     COLOR_VALUES,
     COLOR_PURPLE,
     COLOR_RED,
 )
-from oq_belief_state import OQFullBeliefState
+from oq.belief_state import OQFullBeliefState
 
 MAX_CLICKS = 7
 

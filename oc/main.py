@@ -2,7 +2,7 @@
 main.py
 
 Entry point. Run with:
-    python main.py
+    python -m oc.main
 
 Evaluates VOI at depths 1, 2, 3, 4 alongside POMDP, entropy, halving, baseline.
 All caches stored in cache/ folder.
@@ -13,11 +13,11 @@ import time
 import pickle
 import numpy as np
 
-from oc_board_generator import enumerate_boards, compute_board_weights
-from oc_belief_state import FullBeliefState
-from oc_strategies import ExactPOMDP, VOIGreedy, EntropyMinimization, CandidateHalving
-from oc_simulation import run_simulation, compute_summary, compute_by_center_color
-from oc_analysis import run_analysis
+from oc.board_generator import enumerate_boards, compute_board_weights
+from oc.belief_state import FullBeliefState
+from oc.strategies import ExactPOMDP, VOIGreedy, EntropyMinimization, CandidateHalving
+from oc.simulation import run_simulation, compute_summary, compute_by_center_color
+from oc.analysis import run_analysis
 
 CACHE_DIR     = 'cache'
 BOARDS_CACHE  = f'{CACHE_DIR}/all_boards.npy'

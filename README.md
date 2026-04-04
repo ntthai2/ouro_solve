@@ -424,19 +424,19 @@ cache/
   results.parquet             — OC raw simulation results
   summary.csv                 — OC per-strategy summary statistics
 
-oc_board_generator.py         — OC exhaustive board enumeration, hypothesis-A weights
-oc_belief_state.py            — OC LightBeliefState + FullBeliefState (weighted)
-oc_strategies.py              — OC POMDP, VOI (all depths), entropy min, candidate halving, baseline
-oc_simulation.py              — OC exact evaluation across all boards with weighted statistics
-oc_analysis.py                — OC parquet export, score distribution and heatmap plots
-oc_main.py                    — OC entry point with cache management
-oc_server.py                  — OC-only HTTP policy server (legacy)
+oc/board_generator.py         — OC exhaustive board enumeration, hypothesis-A weights
+oc/belief_state.py            — OC LightBeliefState + FullBeliefState (weighted)
+oc/strategies.py              — OC POMDP, VOI (all depths), entropy min, candidate halving, baseline
+oc/simulation.py              — OC exact evaluation across all boards with weighted statistics
+oc/analysis.py                — OC parquet export, score distribution and heatmap plots
+oc/main.py                    — OC entry point with cache management
+server.py                     — unified HTTP policy server for both $oc and $oq
 
-oq_board_generator.py         — OQ board enumeration (all C(25,4) purple placements)
-oq_belief_state.py            — OQ FullBeliefState with Moore neighbor constraint updates
-oq_strategies.py              — OQ VOI (depths 1–2) with cascade bonus fallback
-oq_simulation.py              — OQ exact evaluation across all boards
-oq_main.py                    — OQ entry point with cache management
+oq/board_generator.py         — OQ board enumeration (all C(25,4) purple placements)
+oq/belief_state.py            — OQ FullBeliefState with Moore neighbor constraint updates
+oq/strategies.py              — OQ VOI (depths 1–2) with cascade bonus fallback
+oq/simulation.py              — OQ exact evaluation across all boards
+oq/main.py                    — OQ entry point with cache management
 
 server.py                     — unified HTTP policy server for both $oc and $oq
 guide.html                    — unified browser-based live assistant UI (mode toggle)
