@@ -1,8 +1,4 @@
 */__pycache__
+/__pycache__
 /.vscode
-/plots
-/cache/*
-!/cache/voi_d3_cache.pkl
-!/cache/all_boards.npy
-!/cache/voi_oq_d2_cache.pkl
-!/cache/all_boards_oq.npy
+/archive
