@@ -16,17 +16,98 @@ except ImportError:
     tqdm = None
 
 from ot.belief_state import OTBeliefState
-from ot.board_generator import NUM_CELLS, COLOR_BLUE, COLOR_WHITE, COLOR_BLACK, COLOR_VALUES
+from ot.board_generator import NUM_CELLS, COLOR_BLUE, COLOR_WHITE, COLOR_BLACK, COLOR_VALUES, COLOR_NAMES
 
 MAX_BLUE_CLICKS = 4
 
+# Base values
+RED_BASE_VALUE = 150
+RAINBOW_BASE_VALUE = 500
+PURPLE_BASE_VALUE = 5
+
+SPAWN_POOL_10 = [
+    "blue", "teal", "green", "yellow", "orange",
+    "purple", "red", "rainbow", "white", "black"
+]
+
+BASE_VALUES = {
+    "blue": 10,
+    "teal": 20,
+    "green": 35,
+    "yellow": 55,
+    "orange": 90,
+    "purple": PURPLE_BASE_VALUE,
+    "red": RED_BASE_VALUE,
+    "rainbow": RAINBOW_BASE_VALUE,
+    "white": 100,  # Fallback for recursion guard
+    "black": 120,  # Fallback for recursion guard
+}
+
+WHITE_SPAWN_WEIGHTS = {
+    "blue": 0.516,
+    "teal": 0.129,
+    "green": 0.065,
+    "orange": 0.065,
+    "purple": 0.065,
+    "yellow": 0.032,
+    "red": 0.032,
+    "rainbow": 0.032,
+    "white": 0.032,
+    "black": 0.032,
+}
+
+WHITE_SPAWN_COLORS = list(WHITE_SPAWN_WEIGHTS.keys())
+WHITE_SPAWN_PROBS = [WHITE_SPAWN_WEIGHTS[c] for c in WHITE_SPAWN_COLORS]
+
+def sample_white_cascade(depth: int = 0, max_depth: int = 3) -> int:
+    """
+    White click: spawns 3-5 spheres. Total value = sum of base values + 16 (once).
+    If a spawned sphere is White or Black, recursively resolves its cascade.
+    """
+    count = random.randint(3, 5)
+    spawned = random.choices(WHITE_SPAWN_COLORS, weights=WHITE_SPAWN_PROBS, k=count)
+    total_base = 0
+    for color_name in spawned:
+        if color_name == "white":
+            if depth < max_depth:
+                total_base += sample_white_cascade(depth=depth + 1, max_depth=max_depth)
+            else:
+                total_base += BASE_VALUES["white"]
+        elif color_name == "black":
+            if depth < max_depth:
+                total_base += sample_black_cascade(depth=depth + 1, max_depth=max_depth)
+            else:
+                total_base += BASE_VALUES["black"]
+        else:
+            total_base += BASE_VALUES[color_name]
+    return total_base + 16
+
+def sample_black_cascade(depth: int = 0, max_depth: int = 3) -> int:
+    """
+    Black click: spawns 1 sphere uniformly from 10 colors.
+    Value = base of spawned sphere + 16.
+    If spawned sphere is White or Black, recursively resolves its cascade.
+    """
+    spawned = random.choice(SPAWN_POOL_10)
+    if spawned == "white":
+        if depth < max_depth:
+            sphere_val = sample_white_cascade(depth=depth + 1, max_depth=max_depth)
+        else:
+            sphere_val = BASE_VALUES["white"]
+    elif spawned == "black":
+        if depth < max_depth:
+            sphere_val = sample_black_cascade(depth=depth + 1, max_depth=max_depth)
+        else:
+            sphere_val = BASE_VALUES["black"]
+    else:
+        sphere_val = BASE_VALUES[spawned]
+    return sphere_val + 16
+
 def sample_value(color: int) -> int:
     if color == COLOR_WHITE:
-        # Example random distribution for White: mean 150, std 20
-        return int(max(0, random.gauss(150, 20)))
+        return sample_white_cascade()
     elif color == COLOR_BLACK:
-        # Example random distribution for Black: mean 250, std 50
-        return int(max(0, random.gauss(250, 50)))
+        return sample_black_cascade()
     else:
         return COLOR_VALUES[color]
 

@@ -5,9 +5,9 @@ import numpy as np
 # Add parent directory to path so we can import ot
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ot.board_generator import generate_n_random_boards, COLOR_BLUE, COLOR_VALUES
+from ot.board_generator import generate_n_random_boards, COLOR_BLUE, COLOR_WHITE, COLOR_BLACK, COLOR_VALUES
 from ot.strategies import RandomStrategy, OTHybridStrategy, OTInfoGainStrategy
-from ot.simulation import run_simulation_ot
+from ot.simulation import run_simulation_ot, sample_value
 
 def main():
     print("Generating 300 random OT boards for benchmark (Ablation study)...")
@@ -25,9 +25,7 @@ def main():
         for c in range(25):
             color = int(b[c])
             if color != COLOR_BLUE:
-                if color == 5: ev += 150 # White
-                elif color == 6: ev += 250 # Black
-                else: ev += COLOR_VALUES[color]
+                ev += sample_value(color)
         ev += 40 # 4 Blue clicks
         oracle_evs.append(ev)
         

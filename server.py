@@ -447,8 +447,8 @@ def _game_for_mode(mode: str):
     if mode == "oq":
         return oq_game, OQ_NUM_CELLS, 6
     if mode == "ot":
-        # maximum color id for ot is not strictly 6 since RARE_COLORS vary, but 6 is a good upper bound (0=Blue,1=Teal,2=Green,3=Yellow,4=Orange,5=White,6=Black)
-        return ot_game, OT_NUM_CELLS, 6
+        # maximum color id for ot is 8 (0=Blue,1=Teal,2=Green,3=Yellow,4=Orange,5=White,6=Black,7=Red,8=Rainbow)
+        return ot_game, OT_NUM_CELLS, 8
     return None, None, None
 
 

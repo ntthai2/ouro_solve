@@ -442,10 +442,13 @@ The standard colors are always present, alongside 1 to 3 rare colors per board. 
 | Teal | 4 | 20 pts | Always present |
 | Green | 3 | 35 pts | Always present |
 | Yellow | 3 | 55 pts | Always present |
-| Orange | 2 | 90 pts | Rare color (1–3 rare colors appear per board) |
-| White | 2 | Variable | Rare color. Clicking spawns 3–5 additional random spheres of unknown color; score = sum of their values. Current implementation assumes uniform random color selection for the spawned spheres — UNVERIFIED against live game data |
-| Black | 2 | Variable | Rare color. Clicking yields 1 random sphere of any other color (Blue through White); score = that sphere's value. Same uniform-assumption caveat as White |
-| Blue | Varies (7–13 depending on $k$) | 10 pts | See loss condition above — costs one of 4 allowed misses |
+| Orange | 2 | 90 pts | Rare color (weighted pool of 5 rare colors) |
+| White | 2 | Variable | Rare color. Spawns 3–5 spheres (weighted distribution across 10 colors); total = sum of bases + 16 (recursive cascade on White/Black) |
+| Black | 2 | Variable | Rare color. Spawns 1 sphere (uniform across 10 colors); value = base + 16 (recursive cascade on White/Black) |
+| Red | 2 | 150 pts | Rare color (rare pool weight 0.057) |
+| Rainbow | 2 | 500 pts | Rare color (rare pool weight 0.057) |
+| Purple | — | 5 pts | Only exists when spawned from White/Black |
+| Blue | Varies (7–13 depending on $k$) | 10 pts | Hazard misses (costs 1 of 4 allowed blue clicks) |
 
 *Note: Live game displays these values with a personal +16 bonus applied uniformly (e.g. Teal shows as 36, Orange as 106). Additive bonus does not change relative ranking between colors, so it is omitted from internal calculations — table shows base values only.*
 
@@ -463,19 +466,17 @@ This provides structural constraints to deduce safe (non-blue) cells and locate 
 
 Exhaustive combinatorial counting via backtracking bitmask dynamic programming (`ot/exact_counting.py`) reveals the exact size of the valid board configuration space:
 
-$$\begin{aligned}
-N(k=1) &= 277,440 \quad (\approx 1.82\%) \\
-N(k=2) &= 3,584,448 \quad (\approx 23.57\%) \\
-N(k=3) &= 11,345,760 \quad (\approx 74.61\%) \\
-\hline
-\mathbf{Total\ N} &= \mathbf{15,207,648\ \text{configurations}}
-\end{aligned}$$
+| Configuration Subspace | Count ($N$) | Proportion |
+|---|---|---|
+| $N(k=1)$ | 277,440 | $\approx 1.82\%$ |
+| $N(k=2)$ | 3,584,448 | $\approx 23.57\%$ |
+| $N(k=3)$ | 11,345,760 | $\approx 74.61\%$ |
+| **Total $N$** | **15,207,648** | **100.00%** |
 
-### Uniform Distribution Assumption
-This distribution assumes the game generates boards uniformly at random across all 15,207,648 valid configurations. Unlike $oc$ (where uniform red position was confirmed on 46 real games via chi-square test), this uniform prior remains an **unverified hypothesis** for $ot$.
-
-### Data Generation Bias Case Study
-The initial `generate_random_board()` implementation uniformly chose $k \in \{1, 2, 3\}$ with equal 33.3% probability before placing runs. This introduced a massive synthetic bias towards low-$k$ boards. Correcting the sampling weights to match the exact combinatorial distribution ($P(k=3) \approx 74.6\%$) shifted the Oracle EV from ~1045 to 1100.24, and the Hybrid Greedy EV from ~752 to 950.11 (86.35% of Oracle). This ~198 pt discrepancy was entirely caused by data generation bias, not algorithmic modifications.
+### Empirical $P(k)$ Distribution vs. Uniform Space Prior
+While the geometric configuration space has $N = 15,207,648$ total states with $74.6\%$ in $k=3$, real game observations ($n=13$ games: $k=1: 0, k=2: 9, k=3: 4$, chi-square $p \approx 0.0003$) reveal that the server samples $k$ closer to an empirical distribution. Using Laplace smoothing ($n=13$, $+1$ per category, denominator $=16$):
+$$P(k=1) = 6.25\%, \quad P(k=2) = 62.50\%, \quad P(k=3) = 31.25\%$$
+This distribution is now actively used in `board_generator.py` for all simulation benchmarks.
 
 ---
 
@@ -493,8 +494,6 @@ A Value of Information (VOI) trade-off strategy parameterized by $\lambda$:
 $$\text{Score}(\text{cell}) = -\lambda \cdot P(\text{blue}) + (1 - \lambda) \cdot \mathbb{E}[\text{new safe cells}]$$
 It favors cells that carry a small risk of being Blue if they offer high information gain (collapsing constraints to produce guaranteed safe cells on the subsequent move).
 
-*Validation History*: InfoGain was initially tested on $N=300$ boards and appeared to significantly outperform Greedy (+21 to +26 EV at $\lambda=0.90\text{–}0.95$). However, this advantage did not survive re-validation at $N=1500$ after fixing the $k$-distribution bias: Greedy actually wins by $+19.87$ EV ($t = -1.983, p \approx 0.048$, borderline significance). The $N=300$ result was Monte Carlo sampling noise on a small board sample, not a real algorithmic advantage — documented here as a cautionary case study on sample size.
-
 ### Oracle Strategy
 A theoretical maximum strategy that perfectly knows the hidden board. It safely clicks all non-blue cells, then clicks exactly 4 blue cells to maximize score without losing.
 
@@ -507,26 +506,18 @@ Strategies are benchmarked dynamically by running the simulation script, which e
 python ot/main.py
 ```
 
-### Benchmark Results (N=1500 boards with Exact Combinatorial Priors)
-**Oracle EV (Theoretical Max):** ~1100.24
+### Benchmark Results ($N=1500$ boards with Empirical Laplace $P(k)$ & Full Cascades)
+**Oracle EV (Theoretical Max):** ~1138.47
 
 | Strategy | EV | % Oracle | Win Rate |
 |---|---|---|---|
-| **Hybrid Strategy (Greedy `p_blue`, lam=1.00)** | **950.11** | **86.35%** | **31.40%** |
-| InfoGain(lam=0.95) | 930.23 | 84.55% | 31.00% |
+| **Hybrid Strategy (Greedy `p_blue`, $\lambda=1.00$)** | **796.09** | **69.93%** | **27.73%** |
+| InfoGain($\lambda=0.95$, 1000 MC) | 804.50 | 70.66% | 29.07% |
 
-*Note on Combinatorial Distribution: In the exact uniform board space (15.2M configurations), boards with $k=3$ rare colors dominate (~74.6%), while $k=2$ represents ~23.6% and $k=1$ only ~1.8%. Because boards with 3 rare colors contain more non-blue high-scoring cells (and fewer blue hazard cells), the true **Oracle EV increases from ~1045 to 1100.24**, and the **Hybrid Greedy EV reaches 950.11 (~86.4% of Oracle)**.*
-
-*Statistical Validation: On the true distribution, a paired T-test ($N=1500$) shows Greedy outperforming 1-step InfoGain by $+19.87$ EV ($t = -1.983, p \approx 0.048$, borderline statistical significance). Combined with zero hyperparameter tuning and simpler execution, Hybrid Greedy is the definitive production strategy.*
-
-> [!TIP]
-> **Core Principle — Data Generation Bias vs. Algorithmic Bias**: A fundamental takeaway from the $ot$ benchmark analysis is that **bias in the data generation layer (e.g., assuming $k$ is sampled uniformly vs. uniform across all 15.2M board configurations) distorts empirical conclusions far more severely than subtle algorithmic nuances**. Always verify data priors against mathematical combinatorics before drawing final benchmark conclusions across $oc$, $oq$, and $ot$.
-
-> [!WARNING]
-> **Uniform Board Prior Assumption**: The distribution $P(k=1) \approx 1.8\%$, $P(k=2) \approx 23.6\%$, $P(k=3) \approx 74.6\%$ assumes the live game samples uniformly from all 15,207,648 geometrically valid board configurations. If the game server instead chooses $k \in \{1, 2, 3\}$ uniformly first before placing lines, the true EV would lie around ~752. Both numbers reflect the same Hybrid algorithm under different prior assumptions.
-
-> [!WARNING]
-> **Temporary Rare Color Values**: The point values for the rare colors `White` and `Black` are currently rough estimates (assumed uniform distribution over 6 colors in `board_generator.py`). They need to be field-validated and calibrated against real game data. The absolute EV and `p_blue` estimations for boards containing White/Black might be slightly skewed until these values are corrected, though this does not affect the structural correctness of the algorithm.
+*Statistical Validation ($N=1500$ paired runs):*
+- Mean paired difference (InfoGain − Greedy): $+8.41$ pts ($\text{SE} = 12.75$)
+- Paired $t$-test: $t = 0.659, p = 0.5097 \gg 0.05$ (difference is **NOT statistically significant**).
+- **Conclusion**: Greedy ($\lambda=1.00$) remains the definitive production strategy due to identical statistical performance, zero hyperparameter tuning, and faster computation time.
 
 ---
 
@@ -570,47 +561,46 @@ A single key on `(board_indices, clicks_left)` causes the value function to retu
 - POMDP and VOI depth=5 producing identical results to 6 decimal places confirms both compute the same optimal solution for $oc$
 - All strategies respect the 200–440 score range (min 200 = 5 clicks on low-value cells), except VOI d=1 and d=2 which can score lower due to the depth-limited approximation
 - Chi-square test on 46 real game observations confirms hypothesis A (p > 0.05 vs hypothesis B) for $oc$
-- Chi-square goodness-of-fit on 20,000 $ot$ samples ($p = 0.416$) confirms uniform spatial line generation
+- Chi-square goodness-of-fit on 20,000 $ot$ samples ($p = 0.416$) xác nhận generator nội bộ nhất quán với spec hình học của nó — KHÔNG phải xác nhận so với dữ liệu ván thật, vì mẫu là tự-sinh
 
 ### Workspace File Structure
 
-`
-cache/
-  all_boards.npy              — 16,800 OC board configurations (0.4 MB)
-  all_boards_oq.npy           — 12,650 OQ board configurations (0.3 MB)
-  voi_d3_cache.pkl            — OC VOI depth=3 policy table (16.6 MB) ← active live server policy
-  voi_oq_d2_cache.pkl         — OQ VOI depth=2 policy table (1.0 MB) ← active live server policy
-
-archive/
-  exact_counting.py          — OT exact combinatorial counting (15,207,648 boards)
-  benchmark_large_n.py       — OT paired-difference statistical validation benchmark (N=1500)
-
-oc/
-  __init__.py
-  board_generator.py         — OC exhaustive board enumeration, hypothesis-A weights
-  belief_state.py            — OC LightBeliefState + FullBeliefState (weighted)
-  strategies.py              — OC POMDP, VOI (all depths), entropy min, candidate halving, baseline
-  simulation.py              — OC exact evaluation across all boards with weighted statistics
-  analysis.py                — OC parquet export, score distribution and heatmap plots
-  main.py                    — OC entry point with cache management
-
-oq/
-  __init__.py
-  board_generator.py         — OQ board enumeration (all C(25,4) purple placements)
-  belief_state.py            — OQ FullBeliefState with Moore neighbor constraint updates
-  strategies.py              — OQ VOI (depths 1–2) with cascade bonus fallback
-  simulation.py              — OQ exact evaluation across all boards
-  main.py                    — OQ entry point with cache management
-
-ot/
-  board_generator.py         — OT line placement enumeration, exact combinatorial priors (15.2M boards)
-  belief_state.py            — OT belief state with constraint propagation, MC sampling, and FastCounterTwoPass
-  strategies.py              — OT Hybrid strategy (deterministic safe cells -> lowest p_blue), InfoGain VOI strategy
-  simulation.py              — OT game simulator with dynamic point sampling for rare colors
-  main.py                    — OT evaluation entry point with Oracle EV comparison
-
-server.py                     — Unified HTTP policy server serving OC, OQ, and OT recommendations & /explain analysis
-guide.html                    — Modern responsive 3-column live assistant UI supporting OC, OQ, and OT with Explain Move
-start.bat                     — One-click Windows launcher for background policy server & browser UI
-requirements.txt              — Runtime dependencies (numpy, pandas, etc.)
-`
+```text
+.
+├── cache/
+│   ├── all_boards.npy          # 16,800 OC board configurations (0.4 MB)
+│   ├── all_boards_oq.npy       # 12,650 OQ board configurations (0.3 MB)
+│   ├── voi_d3_cache.pkl        # OC VOI depth=3 policy table (16.6 MB) [Active Server Policy]
+│   └── voi_oq_d2_cache.pkl     # OQ VOI depth=2 policy table (1.0 MB) [Active Server Policy]
+│
+├── archive/
+│   ├── exact_counting.py       # OT exact combinatorial counting (15,207,648 boards)
+│   └── benchmark_large_n.py    # OT paired-difference validation benchmark (N=1500)
+│
+├── oc/                         # Ourochest Module ($oc)
+│   ├── board_generator.py      # Exhaustive board enumeration, hypothesis-A weights
+│   ├── belief_state.py         # LightBeliefState + FullBeliefState (weighted)
+│   ├── strategies.py           # POMDP, VOI (all depths), entropy min, candidate halving
+│   ├── simulation.py           # Exact evaluation across all boards with weighted statistics
+│   ├── analysis.py             # Parquet export, score distribution and heatmap plots
+│   └── main.py                 # OC entry point with cache management
+│
+├── oq/                         # Ouroquest Module ($oq)
+│   ├── board_generator.py      # Board enumeration (all C(25,4) purple placements)
+│   ├── belief_state.py         # FullBeliefState with Moore neighbor constraint updates
+│   ├── strategies.py           # VOI (depths 1–2) with cascade bonus fallback
+│   ├── simulation.py           # Exact evaluation across all boards
+│   └── main.py                 # OQ entry point with cache management
+│
+├── ot/                         # Ourotrace Module ($ot)
+│   ├── board_generator.py      # Line placement enumeration & empirical P(k) sampling
+│   ├── belief_state.py         # Constraint propagation, MC sampling & FastCounterTwoPass
+│   ├── strategies.py           # Hybrid strategy (Safe cells -> lowest p_blue) & InfoGain
+│   ├── simulation.py           # Game simulator with recursive White/Black cascades
+│   └── main.py                 # OT benchmark entry point with Oracle EV comparison
+│
+├── server.py                   # Unified HTTP policy server (OC / OQ / OT + /explain)
+├── guide.html                  # Modern 3-column live assistant UI with Explain Move
+├── start.bat                   # One-click Windows launcher
+└── requirements.txt            # Runtime dependencies (numpy, pandas, scipy, tqdm)
+```

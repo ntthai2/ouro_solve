@@ -14,9 +14,10 @@ NUM_CELLS = 25
 
 COLOR_BLUE, COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW = 0, 1, 2, 3
 COLOR_ORANGE, COLOR_WHITE, COLOR_BLACK = 4, 5, 6
+COLOR_RED, COLOR_RAINBOW = 7, 8
 
-COLOR_NAMES = ['blue', 'teal', 'green', 'yellow', 'orange', 'white', 'black']
-COLOR_VALUES = [10, 20, 35, 55, 90, None, None]
+COLOR_NAMES = ['blue', 'teal', 'green', 'yellow', 'orange', 'white', 'black', 'red', 'rainbow']
+COLOR_VALUES = [10, 20, 35, 55, 90, None, None, 150, 500]
 MAX_BLUE_CLICKS = 4
 
 RUN_LENGTHS = {
@@ -25,10 +26,33 @@ RUN_LENGTHS = {
     COLOR_YELLOW: 3,
     COLOR_ORANGE: 2,
     COLOR_WHITE: 2,
-    COLOR_BLACK: 2
+    COLOR_BLACK: 2,
+    COLOR_RED: 2,
+    COLOR_RAINBOW: 2,
 }
 
-RARE_COLORS = [COLOR_ORANGE, COLOR_WHITE, COLOR_BLACK]
+RARE_COLORS = [COLOR_ORANGE, COLOR_WHITE, COLOR_BLACK, COLOR_RED, COLOR_RAINBOW]
+
+RARE_COLOR_WEIGHTS = {
+    COLOR_ORANGE: 0.400,
+    COLOR_WHITE: 0.257,
+    COLOR_BLACK: 0.229,
+    COLOR_RAINBOW: 0.057,
+    COLOR_RED: 0.057,
+}
+
+def sample_rare_colors_without_replacement(k: int) -> List[int]:
+    """Sample k distinct rare colors using weighted sampling without replacement."""
+    pool = list(RARE_COLORS)
+    weights = [RARE_COLOR_WEIGHTS[c] for c in pool]
+    chosen = []
+    for _ in range(k):
+        selected = random.choices(pool, weights=weights, k=1)[0]
+        idx = pool.index(selected)
+        pool.pop(idx)
+        weights.pop(idx)
+        chosen.append(selected)
+    return chosen
 
 def cell(r: int, c: int) -> int:
     return r * GRID_SIZE + c
@@ -52,12 +76,13 @@ PLACEMENTS_CACHE = {
     for length in set(RUN_LENGTHS.values())
 }
 
-# Configuration counts per k (Total: 15,207,648):
-# N(k=1) = 277,440 (1.824345%)
-# N(k=2) = 3,584,448 (23.570035%)
-# N(k=3) = 11,345,760 (74.605620%)
-# Assumption: Uniform distribution across all valid 15.2M board configurations (unverified against live server data)
-K_PROBABILITIES = [277440 / 15207648, 3584448 / 15207648, 11345760 / 15207648]
+# Empirical prior weights over k in {1, 2, 3} based on observed games (n=13: k=1: 0, k=2: 9, k=3: 4)
+# with Laplace smoothing (+1 per category, total denominator = 16):
+# k=1: 1/16 = 0.0625, k=2: 10/16 = 0.625, k=3: 5/16 = 0.3125
+# Note: Combinatorial uniform configuration space yields theoretical counts:
+# N(k=1) = 277,440 (1.82%), N(k=2) = 3,584,448 (23.57%), N(k=3) = 11,345,760 (74.61%).
+# We override with empirical data due to significant observed deviation (chi-square p ~ 0.0003).
+K_PROBABILITIES = [0.0625, 0.625, 0.3125]
 
 def generate_random_board(num_rare: Optional[int] = None) -> Optional[np.ndarray]:
     """
@@ -67,7 +92,7 @@ def generate_random_board(num_rare: Optional[int] = None) -> Optional[np.ndarray
     if num_rare is None:
         num_rare = random.choices([1, 2, 3], weights=K_PROBABILITIES, k=1)[0]
     
-    chosen_rare_colors = random.sample(RARE_COLORS, num_rare)
+    chosen_rare_colors = sample_rare_colors_without_replacement(num_rare)
     colors_to_place = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW] + chosen_rare_colors
     
     board = np.full(NUM_CELLS, COLOR_BLUE, dtype=np.uint8)

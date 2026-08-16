@@ -354,9 +354,13 @@ class OTBeliefState:
                 
         masks_dict = {}
         for c in base_colors + list(self.rare_active):
-            masks_dict[c] = [(sum(1<<x for x in p), p) for p in self.candidate_placements.get(c, [])]
+            if c in self.candidate_placements:
+                masks_dict[c] = [(sum(1<<x for x in p), p) for p in self.candidate_placements[c]]
             
         for subset in valid_subsets:
+            # Filter subset to colors that have candidate placements
+            if not all(c in masks_dict for c in subset):
+                continue
             ways, marginals = counter.count(subset, masks_dict, 0)
             if ways > 0:
                 total_valid += ways
@@ -402,9 +406,12 @@ class OTBeliefState:
                 
         masks_dict = {}
         for c in base_colors + list(self.rare_active):
-            masks_dict[c] = [(sum(1<<x for x in p), p) for p in self.candidate_placements.get(c, [])]
+            if c in self.candidate_placements:
+                masks_dict[c] = [(sum(1<<x for x in p), p) for p in self.candidate_placements[c]]
             
         for subset in valid_subsets:
+            if not all(c in masks_dict for c in subset):
+                continue
             ways, marginals = counter.count(subset, masks_dict, 0)
             if ways > 0:
                 total_valid += ways

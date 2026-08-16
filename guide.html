@@ -529,6 +529,19 @@
       border: 1px solid #555;
     }
 
+    .color-7 {
+      background: radial-gradient(circle at 35% 35%, #f06060, #a02020);
+    }
+
+    .color-8 {
+      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%),
+                  linear-gradient(135deg, #d87d8a 0%, #d89b78 20%, #d4b874 40%, #72b8a2 65%, #6a96c7 85%, #9b82c4 100%);
+      box-shadow: 0 0 5px rgba(155, 130, 196, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #ffffff !important;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
 
 
     .card {
@@ -993,8 +1006,10 @@
       { id: 2, name: 'Green', pts: 35, hex: '#3a6d11' },
       { id: 3, name: 'Yellow', pts: 55, hex: '#9a7a10' },
       { id: 4, name: 'Orange', pts: 90, hex: '#c06010' },
-      { id: 5, name: 'White', pts: 100, hex: '#e8e8e8' },
-      { id: 6, name: 'Black', pts: 120, hex: '#333333' },
+      { id: 5, name: 'White', pts: 'Var', hex: '#e8e8e8' },
+      { id: 6, name: 'Black', pts: 'Var', hex: '#333333' },
+      { id: 7, name: 'Red', pts: 150, hex: '#a02020' },
+      { id: 8, name: 'Rainbow', pts: 500, hex: 'linear-gradient(135deg, #d87d8a, #d89b78, #d4b874, #72b8a2, #6a96c7, #9b82c4)' },
     ];
 
     let currentMode = 'oc';
