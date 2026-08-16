@@ -378,6 +378,9 @@ class OTGame:
         if self.done: return None
         remaining = [c for c in range(OT_NUM_CELLS) if c not in self.clicked_cells]
         if not remaining: return None
+        # Root opening: C3 (Cell 12) is proven lowest p_blue (~33.2%)
+        if len(self.clicked_cells) == 0:
+            return 12
         if self._cached_rec is None or self._cached_rec not in remaining:
             self._cached_rec = ot_policy(self.belief, remaining)
         return self._cached_rec
