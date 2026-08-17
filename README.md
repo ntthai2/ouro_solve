@@ -506,18 +506,19 @@ Strategies are benchmarked dynamically by running the simulation script, which e
 python ot/main.py
 ```
 
-### Benchmark Results ($N=1500$ boards with Empirical Laplace $P(k)$ & Full Cascades)
-**Oracle EV (Theoretical Max):** ~1138.47
+### Benchmark Results ($N=1500$ boards with Empirical Laplace $P(k)$ & Restricted Cascades)
+**Oracle EV (Theoretical Max):** 1122.64
 
-| Strategy | EV | % Oracle | Win Rate |
-|---|---|---|---|
-| **Hybrid Strategy (Greedy `p_blue`, $\lambda=1.00$)** | **796.09** | **69.93%** | **27.73%** |
-| InfoGain($\lambda=0.95$, 1000 MC) | 804.50 | 70.66% | 29.07% |
+| Strategy | EV | % Oracle | Win Rate | % Non-Blue (Loss) | Blue Clicks (Win) |
+|---|---|---|---|---|---|
+| **Hybrid Strategy (Exact Endgame, 1000 samples)** | **749.97** | **66.80%** | **3.73%** | **77.57%** | **4.00** |
+| InfoGain($\lambda=0.90$, 1000 MC) | 753.11 | 67.08% | 3.07% | 77.17% | 4.00 |
+| InfoGain($\lambda=0.70$, 1000 MC) | 724.15 | 64.50% | 3.07% | 72.20% | 4.00 |
+| InfoGain($\lambda=0.50$, 1000 MC) | 691.15 | 61.56% | 4.80% | 67.25% | 4.00 |
 
-*Statistical Validation ($N=1500$ paired runs):*
-- Mean paired difference (InfoGain − Greedy): $+8.41$ pts ($\text{SE} = 12.75$)
-- Paired $t$-test: $t = 0.659, p = 0.5097 \gg 0.05$ (difference is **NOT statistically significant**).
-- **Conclusion**: Greedy ($\lambda=1.00$) remains the definitive production strategy due to identical statistical performance, zero hyperparameter tuning, and faster computation time.
+*Performance Observations:*
+- **Conclusion**: The Hybrid Strategy (EV = 749.97) and InfoGain $\lambda=0.90$ (EV = 753.11) perform identically within statistical margin of error. Hybrid is kept as the production strategy because it requires zero hyperparameter tuning and is fundamentally faster/easier to reason about.
+- **Win Rate Drop**: The overall win rate across all strategies has settled at ~3-4%, which is drastically lower than earlier uncalibrated cascade models. This is mathematically correct since the artificially inflated values of White/Black have been replaced with their true expected cascade values (which are significantly lower), combined with the density of the 4 rare colored strips forcing a tight geometric survival path.
 
 ---
 
@@ -561,7 +562,14 @@ A single key on `(board_indices, clicks_left)` causes the value function to retu
 - POMDP and VOI depth=5 producing identical results to 6 decimal places confirms both compute the same optimal solution for $oc$
 - All strategies respect the 200–440 score range (min 200 = 5 clicks on low-value cells), except VOI d=1 and d=2 which can score lower due to the depth-limited approximation
 - Chi-square test on 46 real game observations confirms hypothesis A (p > 0.05 vs hypothesis B) for $oc$
-- Chi-square goodness-of-fit on 20,000 $ot$ samples ($p = 0.416$) xác nhận generator nội bộ nhất quán với spec hình học của nó — KHÔNG phải xác nhận so với dữ liệu ván thật, vì mẫu là tự-sinh
+- Chi-square goodness-of-fit on 20,000 $ot$ samples ($p = 0.416$) confirms the internal generator is consistent with its geometric specification — this is NOT a confirmation against real game data, as the sample is self-generated.
+
+### $ot Empirical Observations & Validation (Data from 13 games)
+
+- **Cascade Restrictions**: A cascade (Black spawning White, which then spawns a cluster) has been observed **twice** (game3: `O, W -> GBBGG 141`; game10: `W -> BBBB 56, P 11`). Both times were Black spawning White; White→White, Black→Black, and White→Black have never been observed. Both instances exactly matched the White formula (Σbase+16).
+- **Black Output Gap**: Among the 10 colors in the spawn pool, **Black is the ONLY color never observed as a spawned result** (from either White or Black) across 13 games. This is a known gap due to small sample size.
+- **Rainbow Base Value (500)**: The value of a Rainbow spawned by Black has been observed **twice** (game4: 516, game6: 516). **Both exactly equaled 516**, reinforcing the assumption that each color has a fixed deterministic base value rather than being drawn from a distribution.
+- **White Cluster Size**: Empirical observations of cluster sizes spawned by White: size=3 has never been seen; size=4 and size=5 have been seen 3 times each (n=6). The cluster size distribution has been recalibrated to `uniform(4, 5)`. *Note: n=6 is still a very small sample; this requires recalibration when more data is available.*
 
 ### Workspace File Structure
 

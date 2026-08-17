@@ -31,14 +31,13 @@ RUN_LENGTHS = {
     COLOR_RAINBOW: 2,
 }
 
-RARE_COLORS = [COLOR_ORANGE, COLOR_WHITE, COLOR_BLACK, COLOR_RED, COLOR_RAINBOW]
+RARE_COLORS = [COLOR_WHITE, COLOR_BLACK, COLOR_RED, COLOR_RAINBOW]
 
 RARE_COLOR_WEIGHTS = {
-    COLOR_ORANGE: 0.400,
-    COLOR_WHITE: 0.257,
-    COLOR_BLACK: 0.229,
-    COLOR_RAINBOW: 0.057,
-    COLOR_RED: 0.057,
+    COLOR_WHITE: 0.429,
+    COLOR_BLACK: 0.381,
+    COLOR_RAINBOW: 0.095,
+    COLOR_RED: 0.095,
 }
 
 def sample_rare_colors_without_replacement(k: int) -> List[int]:
@@ -76,24 +75,19 @@ PLACEMENTS_CACHE = {
     for length in set(RUN_LENGTHS.values())
 }
 
-# Empirical prior weights over k in {1, 2, 3} based on observed games (n=13: k=1: 0, k=2: 9, k=3: 4)
-# with Laplace smoothing (+1 per category, total denominator = 16):
-# k=1: 1/16 = 0.0625, k=2: 10/16 = 0.625, k=3: 5/16 = 0.3125
-# Note: Combinatorial uniform configuration space yields theoretical counts:
-# N(k=1) = 277,440 (1.82%), N(k=2) = 3,584,448 (23.57%), N(k=3) = 11,345,760 (74.61%).
-# We override with empirical data due to significant observed deviation (chi-square p ~ 0.0003).
-K_PROBABILITIES = [0.0625, 0.625, 0.3125]
+# Empirical prior weights over m_extra in {1, 2} based on observed games.
+M_PROBABILITIES = [0.6667, 0.3333]
 
-def generate_random_board(num_rare: Optional[int] = None) -> Optional[np.ndarray]:
+def generate_random_board(m_extra: Optional[int] = None) -> Optional[np.ndarray]:
     """
-    Generate a random board using backtracking with exact prior weights over k in {1, 2, 3}.
+    Generate a random board using backtracking with exact prior weights over m_extra in {1, 2}.
     Returns the board as a numpy array, or None if it fails to find a valid placement.
     """
-    if num_rare is None:
-        num_rare = random.choices([1, 2, 3], weights=K_PROBABILITIES, k=1)[0]
+    if m_extra is None:
+        m_extra = random.choices([1, 2], weights=M_PROBABILITIES, k=1)[0]
     
-    chosen_rare_colors = sample_rare_colors_without_replacement(num_rare)
-    colors_to_place = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW] + chosen_rare_colors
+    chosen_rare_colors = sample_rare_colors_without_replacement(m_extra)
+    colors_to_place = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE] + chosen_rare_colors
     
     board = np.full(NUM_CELLS, COLOR_BLUE, dtype=np.uint8)
     
@@ -132,11 +126,11 @@ def generate_random_board(num_rare: Optional[int] = None) -> Optional[np.ndarray
         return board
     return None
 
-def generate_n_random_boards(n: int, num_rare: Optional[int] = None) -> List[np.ndarray]:
+def generate_n_random_boards(n: int, m_extra: Optional[int] = None) -> List[np.ndarray]:
     """Generate a sample of N random boards."""
     boards = []
     for _ in range(n):
-        b = generate_random_board(num_rare)
+        b = generate_random_board(m_extra)
         if b is not None:
             boards.append(b)
     return boards

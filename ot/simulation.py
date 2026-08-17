@@ -25,9 +25,9 @@ RED_BASE_VALUE = 150
 RAINBOW_BASE_VALUE = 500
 PURPLE_BASE_VALUE = 5
 
-SPAWN_POOL_10 = [
+SPAWN_POOL_9 = [
     "blue", "teal", "green", "yellow", "orange",
-    "purple", "red", "rainbow", "white", "black"
+    "purple", "red", "rainbow", "white"
 ]
 
 BASE_VALUES = {
@@ -52,53 +52,30 @@ WHITE_SPAWN_WEIGHTS = {
     "yellow": 0.032,
     "red": 0.032,
     "rainbow": 0.032,
-    "white": 0.032,
-    "black": 0.032,
 }
 
 WHITE_SPAWN_COLORS = list(WHITE_SPAWN_WEIGHTS.keys())
 WHITE_SPAWN_PROBS = [WHITE_SPAWN_WEIGHTS[c] for c in WHITE_SPAWN_COLORS]
 
-def sample_white_cascade(depth: int = 0, max_depth: int = 3) -> int:
+def sample_white_cascade() -> int:
     """
-    White click: spawns 3-5 spheres. Total value = sum of base values + 16 (once).
-    If a spawned sphere is White or Black, recursively resolves its cascade.
+    White click: spawns 4-5 spheres. Total value = sum of base values + 16 (once).
+    White and Black are excluded from its spawn pool, so no further cascade occurs.
     """
-    count = random.randint(3, 5)
+    count = random.choice([4, 5])
     spawned = random.choices(WHITE_SPAWN_COLORS, weights=WHITE_SPAWN_PROBS, k=count)
-    total_base = 0
-    for color_name in spawned:
-        if color_name == "white":
-            if depth < max_depth:
-                total_base += sample_white_cascade(depth=depth + 1, max_depth=max_depth)
-            else:
-                total_base += BASE_VALUES["white"]
-        elif color_name == "black":
-            if depth < max_depth:
-                total_base += sample_black_cascade(depth=depth + 1, max_depth=max_depth)
-            else:
-                total_base += BASE_VALUES["black"]
-        else:
-            total_base += BASE_VALUES[color_name]
+    total_base = sum(BASE_VALUES[color_name] for color_name in spawned)
     return total_base + 16
 
-def sample_black_cascade(depth: int = 0, max_depth: int = 3) -> int:
+def sample_black_cascade() -> int:
     """
-    Black click: spawns 1 sphere uniformly from 10 colors.
+    Black click: spawns 1 sphere uniformly from 9 colors (excluding black).
     Value = base of spawned sphere + 16.
-    If spawned sphere is White or Black, recursively resolves its cascade.
+    If spawned sphere is White, its cascade is resolved.
     """
-    spawned = random.choice(SPAWN_POOL_10)
+    spawned = random.choice(SPAWN_POOL_9)
     if spawned == "white":
-        if depth < max_depth:
-            sphere_val = sample_white_cascade(depth=depth + 1, max_depth=max_depth)
-        else:
-            sphere_val = BASE_VALUES["white"]
-    elif spawned == "black":
-        if depth < max_depth:
-            sphere_val = sample_black_cascade(depth=depth + 1, max_depth=max_depth)
-        else:
-            sphere_val = BASE_VALUES["black"]
+        sphere_val = sample_white_cascade()
     else:
         sphere_val = BASE_VALUES[spawned]
     return sphere_val + 16

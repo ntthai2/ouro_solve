@@ -10,8 +10,8 @@ from ot.strategies import RandomStrategy, OTHybridStrategy, OTInfoGainStrategy
 from ot.simulation import run_simulation_ot, sample_value
 
 def main():
-    print("Generating 300 random OT boards for benchmark (Ablation study)...")
-    boards = generate_n_random_boards(300)
+    print("Generating 1500 random OT boards for benchmark (Ablation study)...")
+    boards = generate_n_random_boards(1500)
     
     print(f"Successfully generated {len(boards)} boards.")
     
