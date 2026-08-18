@@ -905,14 +905,7 @@
       <div class="card" id="inputCard">
         <div class="card-title" id="inputTitle" style="text-align:center">What did you reveal?</div>
         <div class="color-picker" id="colorPicker"></div>
-        <button class="submit-btn" id="submitBtn" disabled onclick="submitReveal()">Submit reveal</button>
-      </div>
-
-      <div class="card">
-        <div class="card-title" style="text-align:center">Click history</div>
-        <div id="history">
-          <div class="no-history">No clicks yet</div>
-        </div>
+        <button class="submit-btn" id="submitBtn" disabled onclick="submitReveal()" style="display:none">Submit reveal</button>
       </div>
 
       <div class="card done-card" id="doneCard" style="display:none">
@@ -923,6 +916,13 @@
         </div>
         <div class="done-pct" id="donePct">0% of maximum</div>
         <button class="reset-btn" style="margin-top:12px" onclick="reset()">New game</button>
+      </div>
+
+      <div class="card" id="historyCard" style="display:none">
+        <div class="card-title" style="text-align:center">Click history</div>
+        <div id="history">
+          <div class="no-history">No clicks yet</div>
+        </div>
       </div>
 
       <button class="reset-btn" id="resetBtn" onclick="reset()">Reset game</button>
@@ -997,7 +997,6 @@
       { id: 3, name: 'Yellow', pts: 55, hex: '#9a7a10' },
       { id: 4, name: 'Orange', pts: 90, hex: '#c06010' },
       { id: 5, name: 'Purple', pts: 5, hex: '#7a46c6' },
-      { id: 6, name: 'Red', pts: 150, hex: '#a02020' },
     ];
 
     const OT_COLORS = [
@@ -1006,9 +1005,9 @@
       { id: 2, name: 'Green', pts: 35, hex: '#3a6d11' },
       { id: 3, name: 'Yellow', pts: 55, hex: '#9a7a10' },
       { id: 4, name: 'Orange', pts: 90, hex: '#c06010' },
+      { id: 7, name: 'Red', pts: 150, hex: '#a02020' },
       { id: 5, name: 'White', pts: 'Var', hex: '#e8e8e8' },
       { id: 6, name: 'Black', pts: 'Var', hex: '#333333' },
-      { id: 7, name: 'Red', pts: 150, hex: '#a02020' },
       { id: 8, name: 'Rainbow', pts: 500, hex: 'linear-gradient(135deg, #d87d8a, #d89b78, #d4b874, #72b8a2, #6a96c7, #9b82c4)' },
     ];
 
@@ -1039,17 +1038,32 @@
     function buildColorPicker() {
       const picker = document.getElementById('colorPicker');
       picker.innerHTML = '';
-      picker.style.gridTemplateColumns = currentMode === 'ot' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)';
+      picker.style.gridTemplateColumns = 'repeat(3, 1fr)';
 
       colorsForMode().forEach((c) => {
-        const disabled = currentMode === 'oq' && c.id === 6 && (!state || state.purples_found < 3);
+        const disabled = false;
         const btn = document.createElement('div');
         btn.className = `color-btn${disabled ? ' disabled' : ''}`;
         btn.dataset.color = c.id;
+
+        let displayHex = c.hex;
+        let displayName = c.name;
+        let displayPts = `+${c.pts}`;
+
+        if (currentMode === 'oq' && c.id === 5) {
+          if (state && state.purples_found >= 3) {
+            displayHex = '#a02020';
+            displayName = 'Red';
+            displayPts = '+150';
+          } else {
+            displayPts = `+${c.pts} (Free)`;
+          }
+        }
+
         btn.innerHTML = `
-      <div class="color-dot" style="background:${c.hex}"></div>
-      <div class="color-name">${c.name}</div>
-      <div class="color-pts">+${c.pts}${currentMode === 'oq' && c.id === 5 ? ' (Free)' : ''}</div>
+      <div class="color-dot" style="background:${displayHex}"></div>
+      <div class="color-name">${displayName}</div>
+      <div class="color-pts">${displayPts}</div>
     `;
         if (!disabled) {
           btn.onclick = () => selectColor(c.id);
@@ -1065,6 +1079,9 @@
       });
       document.getElementById('submitBtn').disabled =
         (pendingCell === null || selectedColor === null || (state && state.done));
+      if (pendingCell !== null && selectedColor !== null && !(state && state.done)) {
+        submitReveal();
+      }
     }
 
     async function submitDirectReveal(cellIdx, colorId) {
@@ -1105,6 +1122,10 @@
       document.getElementById('submitBtn').disabled =
         (selectedColor === null || state.done);
       loadExplanation(idx);
+
+      if (pendingCell !== null && selectedColor !== null) {
+        submitReveal();
+      }
     }
 
     function buildGrid(cells) {
@@ -1198,6 +1219,7 @@
         document.getElementById('resetBtn').style.display = 'none';
         document.getElementById('inputCard').style.display = 'none';
         if (explainPanel) explainPanel.style.display = 'none';
+        document.getElementById('historyCard').style.display = 'block';
 
         document.getElementById('doneScore').textContent = s.score;
         document.getElementById('doneFill').style.width = `${pct}%`;
@@ -1206,6 +1228,7 @@
         document.getElementById('doneCard').style.display = 'none';
         document.getElementById('resetBtn').style.display = 'block';
         document.getElementById('inputCard').style.display = 'block';
+        document.getElementById('historyCard').style.display = 'none';
       }
     }
 
@@ -1297,6 +1320,7 @@
 
     function render(s) {
       state = s;
+      buildColorPicker();
       renderHistory(s);
       renderDoneCard(s);
       buildGrid(s.cells);
@@ -1329,11 +1353,16 @@
     async function submitReveal() {
       if (pendingCell === null || selectedColor === null) return;
 
+      let colorToSend = selectedColor;
+      if (currentMode === 'oq' && selectedColor === 5 && state && state.purples_found >= 3) {
+        colorToSend = 6;
+      }
+
       try {
         const r = await fetch(`${API}/reveal?mode=${currentMode}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cell: pendingCell, color: selectedColor }),
+          body: JSON.stringify({ cell: pendingCell, color: colorToSend }),
         });
         const s = await r.json();
 

@@ -225,6 +225,9 @@ class OQGame:
                 self.done = True
             return
 
+        if color == COLOR_PURPLE and self.purples_found >= 3:
+            color = COLOR_RED
+
         if color == COLOR_RED:
             if self.purples_found != 3:
                 return
