@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>SeeRed - Unified Guide</title>
   <style>
     :root {
@@ -12,12 +12,16 @@
       --panel-dark: #13151f;
       --panel-border: #252836;
       --text: #e8e8e8;
-      --muted: #666;
-      --muted-2: #555;
+      --muted: #8e94a5;
+      --muted-2: #656b7c;
       --accent: #2a3a5a;
       --accent-hover: #3a4a7a;
       --ok: #3dcba8;
       --err: #e24b4a;
+      --cell-size: 64px;
+      --cell-gap: 6px;
+      --row-label-size: 20px;
+      --sphere-size: 32px;
     }
 
     * {
@@ -27,22 +31,25 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 24px 16px 32px;
+      padding: max(16px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(28px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      -webkit-font-smoothing: antialiased;
     }
 
     h1 {
-      font-size: 28px;
+      font-size: clamp(22px, 5vw, 28px);
       font-weight: 700;
       letter-spacing: -0.5px;
       color: #fff;
       margin-bottom: 4px;
+      text-align: center;
     }
 
     h1 span {
@@ -50,10 +57,13 @@
     }
 
     .subtitle {
-      font-size: 13px;
+      font-size: clamp(11px, 3vw, 13px);
       color: var(--muted);
       margin-bottom: 14px;
       text-align: center;
+      max-width: 560px;
+      line-height: 1.4;
+      padding: 0 8px;
     }
 
     .mode-switch {
@@ -62,8 +72,9 @@
       border: 1px solid #2a2d3e;
       border-radius: 999px;
       padding: 4px;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       gap: 4px;
+      max-width: 100%;
     }
 
     .mode-btn {
@@ -72,11 +83,19 @@
       color: #a5aabd;
       background: transparent;
       padding: 8px 16px;
-      font-size: 12px;
+      font-size: clamp(11px, 2.8vw, 12px);
       font-weight: 700;
       letter-spacing: 0.6px;
       cursor: pointer;
       text-transform: uppercase;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      transition: background 0.15s, color 0.15s;
+    }
+
+    .mode-btn:active {
+      transform: scale(0.96);
     }
 
     .mode-btn.active {
@@ -86,15 +105,15 @@
 
     .layout {
       display: flex;
-      gap: 32px;
+      gap: 28px;
       align-items: flex-start;
       justify-content: center;
       width: 100%;
-      max-width: 1320px;
+      max-width: 1280px;
     }
 
     .grid-section {
-      width: 380px;
+      width: auto;
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -105,15 +124,15 @@
     .panel {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      width: 300px;
+      gap: 14px;
+      width: 320px;
       flex-shrink: 0;
     }
 
     .explain-panel {
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
       width: 380px;
       flex-shrink: 0;
       transition: opacity 0.2s ease;
@@ -124,6 +143,7 @@
       justify-content: space-between;
       align-items: center;
       margin-bottom: 8px;
+      gap: 8px;
     }
 
     .explain-badge {
@@ -136,6 +156,7 @@
       letter-spacing: 0.5px;
       background: #2a3a5a;
       color: #8bb2ff;
+      white-space: nowrap;
     }
 
     .explain-badge.recommended {
@@ -170,6 +191,12 @@
       margin-top: 2px;
     }
 
+    .table-wrapper {
+      width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
     .breakdown-table {
       width: 100%;
       border-collapse: collapse;
@@ -181,11 +208,12 @@
       text-align: left;
       color: var(--muted-2);
       font-weight: 600;
-      padding: 4px 6px;
+      padding: 5px 6px;
       border-bottom: 1px solid #252836;
       text-transform: uppercase;
       font-size: 9px;
       letter-spacing: 0.5px;
+      white-space: nowrap;
     }
 
     .breakdown-table td {
@@ -229,6 +257,7 @@
     .runner-up-text {
       color: #ccc;
       line-height: 1.4;
+      font-size: 11.5px;
     }
 
     .runner-up-highlight {
@@ -246,6 +275,7 @@
       margin-top: 8px;
       font-size: 11px;
       color: #aaa;
+      line-height: 1.35;
     }
 
     .info-gain-icon {
@@ -259,52 +289,58 @@
 
     .col-labels {
       display: grid;
-      grid-template-columns: 20px repeat(5, 64px);
-      gap: 6px;
-      padding-left: 4px;
+      grid-template-columns: var(--row-label-size) repeat(5, var(--cell-size));
+      gap: var(--cell-gap);
+      padding-left: 2px;
+      justify-content: center;
+      width: 100%;
     }
 
     .col-label {
       text-align: center;
-      font-size: 13px;
+      font-size: clamp(11px, 2.8vw, 13px);
       font-weight: 700;
       color: var(--muted-2);
       line-height: 18px;
+      width: var(--cell-size);
     }
 
     .grid-with-rows {
       display: flex;
-      gap: 6px;
+      gap: var(--cell-gap);
+      justify-content: center;
+      width: 100%;
     }
 
     .row-labels {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: var(--cell-gap);
       justify-content: center;
     }
 
     .row-label {
-      width: 20px;
-      height: 64px;
+      width: var(--row-label-size);
+      height: var(--cell-size);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
+      font-size: clamp(11px, 2.8vw, 13px);
       font-weight: 700;
       color: var(--muted-2);
     }
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(5, 64px);
-      gap: 6px;
+      grid-template-columns: repeat(5, var(--cell-size));
+      grid-template-rows: repeat(5, var(--cell-size));
+      gap: var(--cell-gap);
     }
 
     .cell {
-      width: 64px;
-      height: 64px;
-      border-radius: 9px;
+      width: var(--cell-size);
+      height: var(--cell-size);
+      border-radius: clamp(6px, 1.8vw, 9px);
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -315,10 +351,17 @@
       border: 2px solid transparent;
       background: #1e2130;
       gap: 2px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
 
     .cell:hover {
       transform: scale(1.04);
+    }
+
+    .cell:active {
+      transform: scale(0.96);
     }
 
     .cell.recommended {
@@ -349,7 +392,8 @@
       cursor: default;
     }
 
-    .cell.revealed:hover {
+    .cell.revealed:hover,
+    .cell.revealed:active {
       transform: none;
     }
 
@@ -358,7 +402,8 @@
       cursor: default;
     }
 
-    .cell.center:hover {
+    .cell.center:hover,
+    .cell.center:active {
       transform: none;
     }
 
@@ -370,30 +415,25 @@
       cursor: default;
     }
 
-    .cell.done:hover {
+    .cell.done:hover,
+    .cell.done:active {
       transform: none;
     }
 
     @keyframes pulse {
-
-      0%,
-      100% {
+      0%, 100% {
         box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
       }
-
       50% {
         box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.25);
       }
     }
 
     @keyframes conversionPulse {
-
-      0%,
-      100% {
+      0%, 100% {
         box-shadow: 0 0 0 3px rgba(255, 80, 80, 0.28);
         transform: scale(1);
       }
-
       50% {
         box-shadow: 0 0 0 8px rgba(255, 80, 80, 0.45);
         transform: scale(1.03);
@@ -401,7 +441,7 @@
     }
 
     .cell-label {
-      font-size: 12px;
+      font-size: clamp(10px, 2.5vw, 12px);
       font-weight: 400;
       color: #6b7280;
       line-height: 1;
@@ -410,7 +450,7 @@
 
     .cell.recommended .cell-label {
       color: #ffffff;
-      font-weight: 500;
+      font-weight: 600;
     }
 
     .cell.candidate .cell-label {
@@ -439,14 +479,14 @@
     }
 
     .cell.revealed .cell-label {
-      font-size: 10px;
+      font-size: clamp(9px, 2.2vw, 10px);
       font-weight: 400;
       color: #888;
-      margin-top: 2px;
+      margin-top: 1px;
     }
 
     .cell-tag {
-      font-size: 8px;
+      font-size: clamp(7px, 1.8vw, 8px);
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.4px;
@@ -467,25 +507,26 @@
     }
 
     .sphere {
-      width: 32px;
-      height: 32px;
+      width: var(--sphere-size);
+      height: var(--sphere-size);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 9px;
+      font-size: clamp(8px, 2vw, 9px);
       font-weight: 700;
       color: rgba(255, 255, 255, 0.9);
       position: relative;
+      flex-shrink: 0;
     }
 
     .sphere::after {
       content: '';
       position: absolute;
-      top: 5px;
-      left: 10px;
-      width: 10px;
-      height: 6px;
+      top: 15%;
+      left: 28%;
+      width: 32%;
+      height: 20%;
       background: rgba(255, 255, 255, 0.25);
       border-radius: 50%;
       transform: rotate(-30deg);
@@ -542,13 +583,12 @@
       text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
     }
 
-
-
     .card {
       background: var(--panel);
       border-radius: 12px;
-      padding: 16px;
+      padding: clamp(12px, 3vw, 16px);
       border: 1px solid var(--panel-border);
+      width: 100%;
     }
 
     .card-title {
@@ -640,28 +680,39 @@
     .color-picker {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
+      gap: clamp(6px, 1.5vw, 8px);
+      width: 100%;
     }
 
     .color-btn {
       padding: 8px 4px;
+      min-height: 52px;
       border-radius: 8px;
       border: 1.5px solid transparent;
       cursor: pointer;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 5px;
+      justify-content: center;
+      gap: 4px;
       background: var(--panel-dark);
-      transition: border-color 0.1s, transform 0.1s;
+      transition: border-color 0.1s, transform 0.1s, background-color 0.1s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
 
     .color-btn:hover {
       transform: scale(1.03);
     }
 
+    .color-btn:active {
+      transform: scale(0.96);
+    }
+
     .color-btn.selected {
       border-color: #fff;
+      background: #222738;
     }
 
     .color-btn.disabled {
@@ -670,26 +721,28 @@
     }
 
     .color-dot {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
+      flex-shrink: 0;
     }
 
     .color-name {
-      font-size: 10px;
+      font-size: 11px;
       color: var(--muted);
       font-weight: 600;
       text-transform: capitalize;
     }
 
     .color-pts {
-      font-size: 9px;
-      color: #444;
+      font-size: 9.5px;
+      color: #777d8e;
     }
 
     .submit-btn {
       width: 100%;
-      padding: 11px;
+      padding: 12px;
+      min-height: 44px;
       border-radius: 8px;
       border: none;
       background: var(--accent);
@@ -697,12 +750,19 @@
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.1s;
+      transition: background 0.1s, transform 0.1s;
       margin-top: 8px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
 
     .submit-btn:hover {
       background: var(--accent-hover);
+    }
+
+    .submit-btn:active {
+      transform: scale(0.98);
     }
 
     .submit-btn:disabled {
@@ -713,19 +773,27 @@
 
     .reset-btn {
       width: 100%;
-      padding: 9px;
+      padding: 10px;
+      min-height: 42px;
       border-radius: 8px;
       border: 1px solid #2a2d3e;
       background: transparent;
       color: var(--muted);
       font-size: 13px;
       cursor: pointer;
-      transition: color 0.1s, border-color 0.1s;
+      transition: color 0.1s, border-color 0.1s, transform 0.1s;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
 
     .reset-btn:hover {
       color: #aaa;
       border-color: #444;
+    }
+
+    .reset-btn:active {
+      transform: scale(0.98);
     }
 
     .history-row {
@@ -742,7 +810,7 @@
 
     .history-num {
       font-size: 11px;
-      color: #444;
+      color: #555;
       width: 16px;
       text-align: center;
     }
@@ -785,7 +853,7 @@
     }
 
     .done-score {
-      font-size: 48px;
+      font-size: clamp(38px, 10vw, 48px);
       font-weight: 800;
       color: #fff;
       line-height: 1;
@@ -851,14 +919,90 @@
       padding: 8px 0;
     }
 
-    @media (max-width: 900px) {
+    /* Tablet and Medium Screens */
+    @media (max-width: 1024px) {
       .layout {
+        flex-wrap: wrap;
         gap: 20px;
+        justify-content: center;
+      }
+
+      .grid-section {
+        width: auto;
       }
 
       .panel {
+        width: 320px;
+      }
+
+      .explain-panel {
         width: 100%;
-        max-width: 420px;
+        max-width: 660px;
+      }
+    }
+
+    /* Mobile Phones & Small Screens */
+    @media (max-width: 767px) {
+      :root {
+        --cell-size: clamp(48px, min(14.2vw, 8.5vh), 60px);
+        --cell-gap: clamp(3px, 1.2vw, 5px);
+        --row-label-size: clamp(14px, 4vw, 18px);
+        --sphere-size: clamp(24px, 7.2vw, 28px);
+      }
+
+      body {
+        padding: max(12px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+      }
+
+      .layout {
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        width: 100%;
+        max-width: 440px;
+      }
+
+      .grid-section,
+      .panel,
+      .explain-panel {
+        width: 100%;
+        max-width: 100%;
+      }
+
+      .explain-summary {
+        gap: 6px;
+      }
+
+      .explain-stat {
+        padding: 6px 8px;
+      }
+
+      .explain-stat-val {
+        font-size: 14px;
+      }
+
+      .breakdown-table th,
+      .breakdown-table td {
+        padding: 5px 4px;
+        font-size: 10.5px;
+      }
+
+      .color-btn {
+        min-height: 48px;
+        padding: 6px 2px;
+      }
+
+      .color-dot {
+        width: 18px;
+        height: 18px;
+      }
+
+      .color-name {
+        font-size: 10px;
+      }
+
+      .color-pts {
+        font-size: 9px;
       }
     }
   </style>
@@ -956,17 +1100,19 @@
 
         <div style="margin-top:14px">
           <div class="card-title" style="font-size:10px; margin-bottom:6px">Color Probability & Value</div>
-          <table class="breakdown-table">
-            <thead>
-              <tr>
-                <th>Color</th>
-                <th>Prob</th>
-                <th>Reward</th>
-                <th>Remaining</th>
-              </tr>
-            </thead>
-            <tbody id="breakdownTbody"></tbody>
-          </table>
+          <div class="table-wrapper">
+            <table class="breakdown-table">
+              <thead>
+                <tr>
+                  <th>Color</th>
+                  <th>Prob</th>
+                  <th>Reward</th>
+                  <th>Remaining</th>
+                </tr>
+              </thead>
+              <tbody id="breakdownTbody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="runner-up-box" id="runnerUpBox">
@@ -1072,14 +1218,35 @@
       });
     }
 
+    function updateInputTitle() {
+      const titleEl = document.getElementById('inputTitle');
+      if (!titleEl) return;
+      if (pendingCell !== null) {
+        titleEl.innerHTML = `Reveal for <span style="color:#fff;font-weight:700">${labelOf(pendingCell)}</span>`;
+      } else if (state && !state.done && state.recommended !== null && state.recommended !== undefined) {
+        titleEl.innerHTML = `Reveal for <span style="color:#fff;font-weight:700">${labelOf(state.recommended)}</span> <span style="font-size:10px;color:#8bb2ff;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">(Recommended)</span>`;
+      } else {
+        titleEl.textContent = 'What did you reveal?';
+      }
+    }
+
     function selectColor(colorId) {
+      if (!state || state.done) return;
+
       selectedColor = colorId;
       document.querySelectorAll('.color-btn').forEach((b) => {
         b.classList.toggle('selected', Number(b.dataset.color) === colorId);
       });
+
+      // Default to recommended cell if no specific cell is pending
+      if (pendingCell === null && state.recommended !== null && state.recommended !== undefined) {
+        pendingCell = state.recommended;
+      }
+
       document.getElementById('submitBtn').disabled =
-        (pendingCell === null || selectedColor === null || (state && state.done));
-      if (pendingCell !== null && selectedColor !== null && !(state && state.done)) {
+        (pendingCell === null || selectedColor === null || state.done);
+
+      if (pendingCell !== null && selectedColor !== null && !state.done) {
         submitReveal();
       }
     }
@@ -1119,6 +1286,7 @@
 
       pendingCell = idx;
       buildGrid(state.cells);
+      updateInputTitle();
       document.getElementById('submitBtn').disabled =
         (selectedColor === null || state.done);
       loadExplanation(idx);
@@ -1324,6 +1492,7 @@
       renderHistory(s);
       renderDoneCard(s);
       buildGrid(s.cells);
+      updateInputTitle();
       if (!s.done) {
         const targetExplain = (pendingCell !== null) ? pendingCell : (currentExplainCell !== null ? currentExplainCell : s.recommended);
         if (targetExplain !== null) {
@@ -1351,6 +1520,9 @@
     }
 
     async function submitReveal() {
+      if (pendingCell === null && state && state.recommended !== null && state.recommended !== undefined) {
+        pendingCell = state.recommended;
+      }
       if (pendingCell === null || selectedColor === null) return;
 
       let colorToSend = selectedColor;
@@ -1385,6 +1557,7 @@
       currentExplainCell = null;
       document.querySelectorAll('.color-btn').forEach((b) => b.classList.remove('selected'));
       document.getElementById('submitBtn').disabled = true;
+      updateInputTitle();
 
       try {
         const r = await fetch(`${API}/reset?mode=${currentMode}`, { method: 'POST' });
@@ -1405,6 +1578,7 @@
       currentExplainCell = null;
       setModeButtons();
       buildColorPicker();
+      updateInputTitle();
       document.getElementById('submitBtn').disabled = true;
 
       const url = new URL(window.location.href);
