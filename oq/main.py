@@ -21,7 +21,7 @@ from oq.simulation import run_simulation_oq
 CACHE_DIR = "cache"
 BOARDS_CACHE = "cache/all_boards_oq.npy"
 VOI_DEPTHS = [2]
-CACHE_VERSION = 1
+CACHE_VERSION = 2
 
 
 # -- cache helpers -------------------------------------------------------------

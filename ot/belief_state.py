@@ -12,9 +12,60 @@ from ot.board_generator import (
     NUM_CELLS,
     COLOR_BLUE, COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW,
     COLOR_ORANGE, COLOR_WHITE, COLOR_BLACK,
-    RUN_LENGTHS, RARE_COLORS,
+    RUN_LENGTHS, RARE_COLORS, RARE_COLOR_WEIGHTS, M_PROBABILITIES,
     enumerate_line_placements
 )
+
+def _sample_rares_subset(pool: List[int], k: int) -> List[int]:
+    """Sample k distinct rare colors from pool using weighted sampling without replacement."""
+    if k <= 0 or not pool:
+        return []
+    p_pool = list(pool)
+    weights = [RARE_COLOR_WEIGHTS.get(c, 1.0) for c in p_pool]
+    chosen = []
+    for _ in range(min(k, len(p_pool))):
+        total_w = sum(weights)
+        if total_w <= 0:
+            selected = random.choice(p_pool)
+        else:
+            selected = random.choices(p_pool, weights=weights, k=1)[0]
+        idx = p_pool.index(selected)
+        p_pool.pop(idx)
+        weights.pop(idx)
+        chosen.append(selected)
+    return chosen
+
+def _sample_n_extra(num_must: int, max_avail: int) -> int:
+    """Sample number of additional rare colors given number of already confirmed rare colors."""
+    if max_avail <= 0:
+        return 0
+    if num_must == 0:
+        choices = [1, 2]
+        weights = [M_PROBABILITIES[0], M_PROBABILITIES[1]]
+    elif num_must == 1:
+        choices = [0, 1]
+        weights = [M_PROBABILITIES[0], M_PROBABILITIES[1]]
+    else:
+        return 0
+    valid = [(c, w) for c, w in zip(choices, weights) if c <= max_avail]
+    if not valid:
+        return 0
+    c_list, w_list = zip(*valid)
+    return random.choices(c_list, weights=w_list, k=1)[0]
+
+def _subset_prior_weight(subset_rares: Set[int]) -> float:
+    """Compute relative prior weight of a specific combination of rare colors."""
+    m = len(subset_rares)
+    if m == 1:
+        wm = M_PROBABILITIES[0]
+    elif m == 2:
+        wm = M_PROBABILITIES[1]
+    else:
+        wm = 1.0
+    w_colors = 1.0
+    for c in subset_rares:
+        w_colors *= RARE_COLOR_WEIGHTS.get(c, 1.0)
+    return wm * w_colors
 
 class FastCounterTwoPass:
     def __init__(self):
@@ -138,8 +189,8 @@ class OTBeliefState:
         """
         safe = set()
         
-        # Colors that are definitely active: Teal, Green, Yellow + revealed rare colors
-        definitely_active = {COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW}
+        # Colors that are definitely active: Teal, Green, Yellow, Orange + revealed rare colors
+        definitely_active = {COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE}
         for c in self.revealed.values():
             if c in RARE_COLORS:
                 definitely_active.add(c)
@@ -173,10 +224,10 @@ class OTBeliefState:
             else:
                 unrevealed.append(c)
                 
-        if use_exact_endgame and len(unrevealed) <= 8:
+        if use_exact_endgame and len(unrevealed) <= 16:
             return self._p_blue_exact(probs, unrevealed)
             
-        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW]
+        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
         blue_counts = [0] * NUM_CELLS
         successes = 0
         
@@ -197,13 +248,13 @@ class OTBeliefState:
             optional_rares = list(self.rare_active - must_have)
             num_must = len(must_have & set(RARE_COLORS))
             min_extra = max(0, 1 - num_must)
-            max_extra = min(len(optional_rares), 3 - num_must)
+            max_extra = min(len(optional_rares), 2 - num_must)
             
             if min_extra > max_extra:
                 continue
                 
-            n_extra = random.randint(min_extra, max_extra)
-            chosen_extra = random.sample(optional_rares, n_extra)
+            n_extra = _sample_n_extra(num_must, max_extra)
+            chosen_extra = _sample_rares_subset(optional_rares, n_extra)
             
             active_this_sample = base_colors + list(must_have & set(RARE_COLORS)) + chosen_extra
             
@@ -249,10 +300,10 @@ class OTBeliefState:
             else:
                 unrevealed.append(c)
                 
-        if use_exact_endgame and len(unrevealed) <= 8:
+        if use_exact_endgame and len(unrevealed) <= 16:
             return self._p_color_exact(probs, unrevealed)
             
-        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW]
+        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
         color_counts = defaultdict(lambda: [0] * NUM_CELLS)
         successes = 0
         
@@ -273,13 +324,13 @@ class OTBeliefState:
             optional_rares = list(self.rare_active - must_have)
             num_must = len(must_have & set(RARE_COLORS))
             min_extra = max(0, 1 - num_must)
-            max_extra = min(len(optional_rares), 3 - num_must)
+            max_extra = min(len(optional_rares), 2 - num_must)
             
             if min_extra > max_extra:
                 continue
                 
-            n_extra = random.randint(min_extra, max_extra)
-            chosen_extra = random.sample(optional_rares, n_extra)
+            n_extra = _sample_n_extra(num_must, max_extra)
+            chosen_extra = _sample_rares_subset(optional_rares, n_extra)
             
             active_this_sample = base_colors + list(must_have & set(RARE_COLORS)) + chosen_extra
             
@@ -325,7 +376,7 @@ class OTBeliefState:
             return probs
             
         counter = FastCounterTwoPass()
-        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW]
+        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
         must_have = set(base_colors)
         for rv in self.revealed.values():
             if rv in RARE_COLORS:
@@ -334,7 +385,7 @@ class OTBeliefState:
         optional_rares = list(self.rare_active - must_have)
         num_must = len(must_have & set(RARE_COLORS))
         min_extra = max(0, 1 - num_must)
-        max_extra = min(len(optional_rares), 3 - num_must)
+        max_extra = min(len(optional_rares), 2 - num_must)
         
         # We must sum over all valid rare subsets, assuming generator uniform choice over 1..3
         # Wait, the true prior over subsets is a bit complex:
@@ -361,12 +412,15 @@ class OTBeliefState:
             # Filter subset to colors that have candidate placements
             if not all(c in masks_dict for c in subset):
                 continue
+            rares_in_subset = set(subset) & (set(RARE_COLORS) | self.rare_active)
+            w_prior = _subset_prior_weight(rares_in_subset)
             ways, marginals = counter.count(subset, masks_dict, 0)
             if ways > 0:
-                total_valid += ways
+                weighted_ways = ways * w_prior
+                total_valid += weighted_ways
                 for i in range(NUM_CELLS):
                     covered_ways = sum(marginals[c][i] for c in subset)
-                    total_blue_counts[i] += (ways - covered_ways)
+                    total_blue_counts[i] += (ways - covered_ways) * w_prior
                     
         if total_valid == 0:
             for c in unrevealed:
@@ -383,7 +437,7 @@ class OTBeliefState:
             return probs
             
         counter = FastCounterTwoPass()
-        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW]
+        base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
         must_have = set(base_colors)
         for rv in self.revealed.values():
             if rv in RARE_COLORS:
@@ -392,7 +446,7 @@ class OTBeliefState:
         optional_rares = list(self.rare_active - must_have)
         num_must = len(must_have & set(RARE_COLORS))
         min_extra = max(0, 1 - num_must)
-        max_extra = min(len(optional_rares), 3 - num_must)
+        max_extra = min(len(optional_rares), 2 - num_must)
         
         total_valid = 0
         total_color_counts = defaultdict(lambda: [0] * NUM_CELLS)
@@ -412,23 +466,30 @@ class OTBeliefState:
         for subset in valid_subsets:
             if not all(c in masks_dict for c in subset):
                 continue
+            rares_in_subset = set(subset) & (set(RARE_COLORS) | self.rare_active)
+            w_prior = _subset_prior_weight(rares_in_subset)
             ways, marginals = counter.count(subset, masks_dict, 0)
             if ways > 0:
-                total_valid += ways
+                weighted_ways = ways * w_prior
+                total_valid += weighted_ways
                 for i in range(NUM_CELLS):
                     covered_ways = 0
                     for c in subset:
-                        w = marginals[c][i]
+                        w = marginals[c][i] * w_prior
                         covered_ways += w
                         total_color_counts[c][i] += w
-                    total_color_counts[COLOR_BLUE][i] += (ways - covered_ways)
+                    total_color_counts[COLOR_BLUE][i] += (ways * w_prior - covered_ways)
                     
         if total_valid == 0:
+            if COLOR_BLUE not in probs:
+                probs[COLOR_BLUE] = [0.0] * NUM_CELLS
             for c in unrevealed:
                 probs[COLOR_BLUE][c] = 1.0
             return probs
             
         for c, counts in total_color_counts.items():
+            if c not in probs:
+                probs[c] = [0.0] * NUM_CELLS
             for cell in unrevealed:
                 probs[c][cell] = counts[cell] / total_valid
                 

@@ -34,10 +34,10 @@ RUN_LENGTHS = {
 RARE_COLORS = [COLOR_WHITE, COLOR_BLACK, COLOR_RED, COLOR_RAINBOW]
 
 RARE_COLOR_WEIGHTS = {
-    COLOR_WHITE: 0.429,
-    COLOR_BLACK: 0.381,
-    COLOR_RAINBOW: 0.095,
-    COLOR_RED: 0.095,
+    COLOR_WHITE: 0.49,
+    COLOR_BLACK: 0.49,
+    COLOR_RAINBOW: 0.01,
+    COLOR_RED: 0.01,
 }
 
 def sample_rare_colors_without_replacement(k: int) -> List[int]:
@@ -75,8 +75,8 @@ PLACEMENTS_CACHE = {
     for length in set(RUN_LENGTHS.values())
 }
 
-# Empirical prior weights over m_extra in {1, 2} based on observed games.
-M_PROBABILITIES = [0.6667, 0.3333]
+# Empirical prior weights over m_extra in {1, 2} calibrated from 16 real games (75% 1-rare, 25% 2-rare).
+M_PROBABILITIES = [0.75, 0.25]
 
 def generate_random_board(m_extra: Optional[int] = None) -> Optional[np.ndarray]:
     """

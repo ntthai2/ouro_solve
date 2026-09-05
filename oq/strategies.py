@@ -87,7 +87,7 @@ class OQExactPOMDP:
         return (belief.key(), clicks_left)
 
     def _pkey(self, belief: OQFullBeliefState, clicks_left: int) -> Tuple:
-        return (belief.key(), clicks_left)
+        return (belief.key(), belief.revealed, clicks_left)
 
     def _effective_reward(self, cell: int, color: int, belief: OQFullBeliefState) -> float:
         if color == COLOR_PURPLE:
@@ -173,7 +173,7 @@ class OQVOIGreedy:
     Free-purple click and converted-red reward rules match OQExactPOMDP.
     """
 
-    def __init__(self, depth: int = 3):
+    def __init__(self, depth: int = 2):
         self.depth = depth
         self.name = f"voi_greedy_oq_d{depth}"
         self._value_memo: Dict[Tuple, float] = {}
@@ -183,7 +183,7 @@ class OQVOIGreedy:
         return (belief.key(), clicks_left)
 
     def _pkey(self, belief: OQFullBeliefState, clicks_left: int) -> Tuple:
-        return (belief.key(), clicks_left)
+        return (belief.key(), belief.revealed, clicks_left)
 
     def _effective_reward(self, cell: int, color: int, belief: OQFullBeliefState) -> float:
         if color == COLOR_PURPLE:
@@ -208,7 +208,12 @@ class OQVOIGreedy:
         # immediate rewards over distinct unclicked cells.
         rewards = sorted((belief.expected_reward(c) for c in unclicked), reverse=True)
         take = min(clicks_left, len(rewards))
-        return float(sum(rewards[:take]))
+        base_ev = float(sum(rewards[:take]))
+
+        # Leaf cascade bonus for purple progress
+        purples = _purples_found(belief)
+        bonus = _purple_cascade_bonus(purples) if purples > 0 else 0.0
+        return base_ev + bonus
 
     def _value(self, belief: OQFullBeliefState, clicks_left: int,
                current_depth: int) -> float:

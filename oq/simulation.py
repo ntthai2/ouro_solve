@@ -118,7 +118,7 @@ def run_game_oq(board: np.ndarray, strategy) -> Dict[str, Any]:
         clicks.append((cell, color, reward, False))
         score += reward
 
-    # After converted red is found, spend remaining paid clicks on best known cells.
+    # After converted red is found, spend remaining paid clicks on best expected cells.
     if found_red:
         while paid_clicks_used < MAX_PAID_CLICKS:
             clicked_cells = {cl[0] for cl in clicks}
@@ -128,11 +128,13 @@ def run_game_oq(board: np.ndarray, strategy) -> Dict[str, Any]:
 
             best = max(
                 unclicked,
-                key=lambda c: (COLOR_VALUES[int(board[c])] if int(board[c]) != COLOR_PURPLE else 0),
+                key=lambda c: belief.expected_reward(c),
             )
-            reward = int(COLOR_VALUES[int(board[best])])
+            color = int(board[best])
+            reward = int(COLOR_VALUES[color])
             score += reward
-            clicks.append((best, int(board[best]), reward, False))
+            belief = belief.update(best, color)
+            clicks.append((best, color, reward, False))
             paid_clicks_used += 1
 
     return {

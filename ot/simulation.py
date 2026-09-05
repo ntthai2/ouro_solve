@@ -127,7 +127,7 @@ def run_game_ot(board: np.ndarray, strategy) -> Dict[str, Any]:
     
     return {
         'score': score,
-        'lost': blue_clicks >= MAX_BLUE_CLICKS,
+        'lost': not win,
         'win': win,
         'cells_cleared': len(clicked),
         'blue_clicks': blue_clicks,

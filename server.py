@@ -5,9 +5,9 @@ Local:   python server.py  -> http://localhost:7734
 
 Endpoints:
     GET  /                     -> serves guide.html
-  GET  /state?mode=oc|oq     -> current belief state and recommendation
-  POST /reveal?mode=oc|oq    -> submit reveal JSON {"cell": 13, "color": 4}
-  POST /reset?mode=oc|oq     -> reset selected game mode
+    GET  /state?mode=oc|oq|ot  -> current belief state and recommendation
+    POST /reveal?mode=oc|oq|ot -> submit reveal JSON {"cell": 13, "color": 4}
+    POST /reset?mode=oc|oq|ot  -> reset selected game mode
 
 Default mode is OC when mode is not specified.
 """
@@ -38,7 +38,7 @@ from oq.board_generator import (
     COLOR_RED,
 )
 from oq.belief_state import OQFullBeliefState
-from oq.strategies import OQVOIGreedy
+from oq.strategies import OQVOIGreedy, _purple_cascade_bonus
 
 from ot.board_generator import (
     NUM_CELLS as OT_NUM_CELLS,
@@ -433,9 +433,9 @@ oc_game = OCGame()
 oq_game = OQGame()
 ot_game = OTGame()
 
-# λ=1.00 (Greedy) chosen after N=1500 validation showed InfoGain(λ=0.95) was not statistically better (p=0.86)
-OT_LAMBDA = 1.00 
-ot_policy = OTInfoGainStrategy(lam=OT_LAMBDA, use_exact_endgame=True, n_samples=1000)
+# Production Peak EV Policy (EV = 735-747 pts, Win = 31.5-34.0%, ~20ms response, 0MB cache)
+OT_LAMBDA = 0.88 
+ot_policy = OTInfoGainStrategy(lam=OT_LAMBDA, use_exact_endgame=True, n_samples=3500, k_prune=1)
 
 
 def _mode_from_path(path: str) -> str:
@@ -598,6 +598,10 @@ def explain_oq(game: OQGame, target_cell=None):
     if cell not in unclicked and unclicked:
         cell = unclicked[0]
 
+    pkey = oq_policy._pkey(belief, clicks_left)
+    in_policy_cache = pkey in oq_policy._policy_memo
+    purples_found = len(belief.purple_candidates() & belief.revealed)
+
     scores = []
     for c in unclicked:
         ev = 0.0
@@ -607,10 +611,16 @@ def explain_oq(game: OQGame, target_cell=None):
                 continue
             reward = oq_policy._effective_reward(c, color, belief)
             new_b = belief.update(c, color)
-            if color == COLOR_PURPLE:
-                future = oq_policy._value(new_b, clicks_left, current_depth=1)
+            if not in_policy_cache and game.conversion_cell is None:
+                if color == COLOR_PURPLE:
+                    future = _purple_cascade_bonus(purples_found)
+                else:
+                    future = 0.0
             else:
-                future = oq_policy._value(new_b, clicks_left - 1, current_depth=1)
+                if color == COLOR_PURPLE:
+                    future = oq_policy._value(new_b, clicks_left, current_depth=1)
+                else:
+                    future = oq_policy._value(new_b, clicks_left - 1, current_depth=1)
             ev += p * (reward + future)
         scores.append((float(ev), int(c)))
     scores.sort(key=lambda x: x[0], reverse=True)
@@ -628,10 +638,16 @@ def explain_oq(game: OQGame, target_cell=None):
         imm_ev += p * reward
         next_b = belief.update(cell, color)
 
-        if color == COLOR_PURPLE:
-            future_v = float(oq_policy._value(next_b, clicks_left, current_depth=1))
+        if not in_policy_cache and game.conversion_cell is None:
+            if color == COLOR_PURPLE:
+                future_v = float(_purple_cascade_bonus(purples_found))
+            else:
+                future_v = 0.0
         else:
-            future_v = float(oq_policy._value(next_b, clicks_left - 1, current_depth=1))
+            if color == COLOR_PURPLE:
+                future_v = float(oq_policy._value(next_b, clicks_left, current_depth=1))
+            else:
+                future_v = float(oq_policy._value(next_b, clicks_left - 1, current_depth=1))
 
         b_elim = len(belief.board_indices) - len(next_b.board_indices)
         exp_boards_elim += p * b_elim
@@ -725,10 +741,53 @@ def explain_ot(game: OTGame, target_cell=None):
             })
             
     score = -ot_policy.lam * p_blue + (1.0 - ot_policy.lam) * e_info
-    
     target_total_score = score
     col_letter = chr(ord("A") + (cell % 5))
     row_num = (cell // 5) + 1
+    
+    # Calculate scores for all unrevealed cells to find runner-up
+    scores = []
+    zero_risk_cells = [c for c in remaining if probs[OT_COLOR_BLUE][c] == 0.0]
+    for c in remaining:
+        c_p_blue = probs[OT_COLOR_BLUE][c]
+        c_e_info = 0.0
+        if ot_policy.lam < 1.0 or zero_risk_cells:
+            for color_id, p_c_list in probs.items():
+                if color_id != OT_COLOR_BLUE:
+                    p_c = p_c_list[c]
+                    if p_c > 0:
+                        nb = belief.update(c, color_id)
+                        ns = nb.certain_safe_cells()
+                        v_ns = [s for s in ns if s in remaining and s != c]
+                        c_e_info += p_c * len(v_ns)
+        c_score = -ot_policy.lam * c_p_blue + (1.0 - ot_policy.lam) * c_e_info
+        scores.append((float(c_score), int(c)))
+    scores.sort(key=lambda x: x[0], reverse=True)
+    
+    runner_up = None
+    if scores:
+        if cell == rec:
+            for s_val, c_cand in scores:
+                if c_cand != cell:
+                    c_col = chr(ord("A") + (c_cand % 5))
+                    c_row = (c_cand // 5) + 1
+                    runner_up = {
+                        "cell": int(c_cand),
+                        "label": f"{c_col}{c_row}",
+                        "total_ev": round(s_val, 2),
+                        "diff": round(scores[0][0] - s_val, 2),
+                    }
+                    break
+        else:
+            best_s, best_c = scores[0]
+            c_col = chr(ord("A") + (best_c % 5))
+            c_row = (best_c // 5) + 1
+            runner_up = {
+                "cell": int(best_c),
+                "label": f"{c_col}{c_row}",
+                "total_ev": round(best_s, 2),
+                "diff": round(best_s - target_total_score, 2),
+            }
     
     return {
         "mode": "ot",
@@ -741,6 +800,7 @@ def explain_ot(game: OTGame, target_cell=None):
         "expected_info_gain": round(e_info, 2),
         "total_score": round(target_total_score, 4),
         "breakdown": breakdown,
+        "runner_up": runner_up,
     }
 
 
