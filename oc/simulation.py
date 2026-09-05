@@ -199,17 +199,29 @@ def compute_summary(df: pd.DataFrame) -> pd.DataFrame:
     """
     Compute per-strategy summary statistics using board_weight for correct
     expected values under Hypothesis A (uniform red position).
+    Includes standard deviation, 95% confidence interval bounds, and empirical min/max.
     """
     rows = []
     for strategy_name, group in df.groupby('strategy'):
-        w = group['board_weight'].values
+        w_raw = group['board_weight'].values
+        w = w_raw / w_raw.sum()
         s = group['score'].values
         f = group['found_red'].values
         c = group['num_clicks'].values
+
+        mean_s = _weighted_mean(s, w)
+        std_s = float(np.sqrt(_weighted_mean((s - mean_s)**2, w)))
+        n_eff = 1.0 / float(np.sum(w**2))
+        se_s = std_s / np.sqrt(n_eff) if n_eff > 0 else 0.0
+        ci_lower = float(mean_s - 1.96 * se_s)
+        ci_upper = float(mean_s + 1.96 * se_s)
+
         rows.append({
             'strategy':          strategy_name,
-            'expected_score':    _weighted_mean(s, w),
-            'score_std':         float(np.sqrt(_weighted_mean((s - _weighted_mean(s, w))**2, w))),
+            'expected_score':    mean_s,
+            'score_std':         std_s,
+            'ci_lower':          ci_lower,
+            'ci_upper':          ci_upper,
             'p_find_red':        _weighted_mean(f, w),
             'avg_clicks':        _weighted_mean(c, w),
             'score_min':         float(s.min()),

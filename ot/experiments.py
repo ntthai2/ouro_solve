@@ -289,11 +289,17 @@ def evaluate_paired(boards: List[np.ndarray], baseline: ConfigurableOTStrategy, 
     base_time = time.time() - t0
 
     base_ev = np.mean(base_scores)
+    base_std = float(np.std(base_scores, ddof=1)) if n_boards > 1 else 0.0
+    base_se = base_std / np.sqrt(n_boards) if n_boards > 0 else 0.0
+    base_ci_l = base_ev - 1.96 * base_se
+    base_ci_u = base_ev + 1.96 * base_se
+    base_min = float(np.min(base_scores))
+    base_max = float(np.max(base_scores))
     base_wr = np.mean(base_wins) * 100
     base_latency = (base_time / n_boards) * 1000
 
-    print(f"{baseline.name:<45} | EV: {base_ev:6.2f} | WR: {base_wr:4.1f}% | Lat: {base_latency:5.1f}ms (REF)")
-    print("-" * 105)
+    print(f"{baseline.name:<40} | EV: {base_ev:6.2f} +/- {base_std:5.2f} | 95% CI: [{base_ci_l:6.2f}, {base_ci_u:6.2f}] | Range: [{base_min:4.0f}, {base_max:4.0f}] | WR: {base_wr:4.1f}% | Lat: {base_latency:5.1f}ms (REF)")
+    print("-" * 140)
 
     # 2. Run Challengers
     for ch in challengers:
@@ -307,6 +313,12 @@ def evaluate_paired(boards: List[np.ndarray], baseline: ConfigurableOTStrategy, 
         ch_time = time.time() - t0
 
         ch_ev = np.mean(ch_scores)
+        ch_std = float(np.std(ch_scores, ddof=1)) if n_boards > 1 else 0.0
+        ch_se = ch_std / np.sqrt(n_boards) if n_boards > 0 else 0.0
+        ch_ci_l = ch_ev - 1.96 * ch_se
+        ch_ci_u = ch_ev + 1.96 * ch_se
+        ch_min = float(np.min(ch_scores))
+        ch_max = float(np.max(ch_scores))
         ch_wr = np.mean(ch_wins) * 100
         ch_latency = (ch_time / n_boards) * 1000
         delta_ev = ch_ev - base_ev
@@ -319,9 +331,9 @@ def evaluate_paired(boards: List[np.ndarray], baseline: ConfigurableOTStrategy, 
             _, p_val = stats.ttest_1samp(diffs, 0.0)
 
         sig = "***" if p_val < 0.001 else ("**" if p_val < 0.01 else ("*" if p_val < 0.05 else "ns"))
-        print(f"{ch.name:<45} | EV: {ch_ev:6.2f} ({delta_ev:+6.2f}) | WR: {ch_wr:4.1f}% ({delta_wr:+4.1f}%) | Lat: {ch_latency:5.1f}ms | p={p_val:.4f} ({sig})")
+        print(f"{ch.name:<40} | EV: {ch_ev:6.2f} +/- {ch_std:5.2f} | 95% CI: [{ch_ci_l:6.2f}, {ch_ci_u:6.2f}] | Range: [{ch_min:4.0f}, {ch_max:4.0f}] | WR: {ch_wr:4.1f}% ({delta_wr:+4.1f}%) | Lat: {ch_latency:5.1f}ms | p={p_val:.4f} ({sig})")
 
-    print("=" * 105)
+    print("=" * 140)
 
 
 def make_production_baseline() -> ConfigurableOTStrategy:

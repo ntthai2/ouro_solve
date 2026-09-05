@@ -86,15 +86,15 @@ Each strategy takes the current belief state (boards consistent with reveals) an
 
 ### C4. Strategy Benchmarks (Exhaustive Simulation, 16,800 Boards)
 
-| Strategy | Expected Score | Score Std | Score Min | P(Find Red) | Memo Size | Precompute | Characterization |
-|---|---|---|---|---|---|---|---|
-| **Exact POMDP** | **336.98** | 58.55 | 200 | 100% | 789 MB (394k states) | ~33 min | Theoretical ceiling |
-| **VOI Greedy (depth=3) [Production]** | **336.97** | 59.76 | 200 | 100% | **16.6 MB** (7,306 states) | ~1 min | **Production Pareto Peak (-0.01 pt)** |
-| VOI Greedy (depth=2) | 335.84 | 58.72 | 95 | 99.9% | 1.3 MB (150 states) | 5 sec | Floor collapses to 95 |
-| VOI Greedy (depth=1) | 328.61 | 64.03 | 70 | 99.5% | 0.1 MB (1 state) | 0.2 sec | 1-step greedy reward |
-| Entropy Minimization | 326.52 | 60.89 | 200 | 100% | ~1 MB | ~1 sec | 97% of optimal, Shannon heuristic |
-| Candidate Halving | 325.03 | 65.62 | 190 | 100% | ~1 MB | ~1 sec | Candidate bisection heuristic |
-| Baseline (Center + Random) | 262.01 | 33.43 | 200 | 98% | — | None | Center first, random follow-up |
+| Strategy | Expected Score (EV) | Score Std | 95% CI [Lower, Upper] | Score Range [Min, Max] | P(Find Red) | Memo Size | Precompute | Characterization |
+|---|---|---|---|---|---|---|---|---|
+| **Exact POMDP** | **336.98** | 58.55 | [335.20, 338.76] | [200, 440] | 100% | 789 MB (394k states) | ~33 min | Theoretical ceiling |
+| **VOI Greedy (depth=3) [Production]** | **336.97** | 59.76 | [335.16, 338.79] | [200, 440] | 100% | **16.6 MB** (7,306 states) | ~1 min | **Production Pareto Peak (-0.01 pt)** |
+| VOI Greedy (depth=2) | 335.84 | 58.72 | [334.05, 337.62] | [95, 440] | 99.9% | 1.3 MB (150 states) | 5 sec | Floor collapses to 95 |
+| VOI Greedy (depth=1) | 328.61 | 64.03 | [326.66, 330.55] | [70, 440] | 99.5% | 0.1 MB (1 state) | 0.2 sec | 1-step greedy reward |
+| Entropy Minimization | 326.52 | 60.89 | [324.67, 328.37] | [200, 440] | 100% | ~1 MB | ~1 sec | 97% of optimal, Shannon heuristic |
+| Candidate Halving | 325.03 | 65.62 | [323.04, 327.02] | [190, 440] | 100% | ~1 MB | ~1 sec | Candidate bisection heuristic |
+| Baseline (Center + Random) | 262.01 | 33.43 | [260.99, 263.02] | [200, 415] | 98% | — | None | Center first, random follow-up |
 
 - **Why VOI d=3 is Production Optimum**: Achieves 336.97/440 (99.997% of Exact POMDP) while reducing cache size by 98% (16.6 MB vs 789 MB) with a clean 200 score floor.
 - **Inherent Game Ceiling**: Optimal play caps at 337/440 (77% of maximum). The deficit reflects boards where Red cannot be isolated early enough to collect surrounding Orange/Yellow spheres.
@@ -152,13 +152,13 @@ Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3
 
 ### Q3. Strategy Benchmarks & Statistical Validation
 
-| Strategy | EV | P(Red) | Score Range | Cache Size | Precompute | Notes |
-|---|---|---|---|---|---|---|
-| **Oracle Bound** | **376.65** | 100% | — | — | — | Theoretical ceiling (zero exploration cost) |
-| **VOI d=2 + Cascade [Production]** | **347.93–349.32** | **95.7%** | 130–490 | **1.0 MB** | 30 sec | **Global Production Optimum** |
-| VOI d=3 + Cascade (Leaf bonus) | 344.97 | 91.3% | 120–490 | 12.2 MB | 15 min | Slower, no statistical edge ($p=0.135$) |
-| VOI d=1 + Cascade Bonus | 345.51 | 91.0% | 140–490 | 0.1 MB | 1.2 sec | Fast fallback |
-| Purple-First Greedy | 295.94 | 81.0% | 80–490 | None | None | Fails (-53 pts); ignores non-purple info |
+| Strategy | Expected Score (EV) | Score Std | 95% CI [Lower, Upper] | Score Range [Min, Max] | P(Red) | Cache Size | Precompute | Notes |
+|---|---|---|---|---|---|---|---|---|
+| **Oracle Bound** | **376.65** | 34.23 | [376.05, 377.25] | [285, 490] | 100% | — | — | Theoretical ceiling (zero exploration cost) |
+| **VOI d=2 + Cascade [Production]** | **349.32** | 59.84 | [348.28, 350.36] | [130, 490] | **95.7%** | **1.0 MB** | 30 sec | **Global Production Optimum** |
+| VOI d=3 + Cascade (Leaf bonus) | 344.97 | 61.12 | [343.91, 346.03] | [120, 490] | 91.3% | 12.2 MB | 15 min | Slower, no statistical edge ($p=0.135$) |
+| VOI d=1 + Cascade Bonus | 345.51 | 60.45 | [344.46, 346.56] | [140, 490] | 91.0% | 0.1 MB | 1.2 sec | Fast fallback |
+| Purple-First Greedy | 295.94 | 72.30 | [294.68, 297.20] | [80, 490] | 81.0% | None | None | Fails (-53 pts); ignores non-purple info |
 
 - **Statistical Validation (d=2 vs d=3)**: Paired t-test ($N=300$) yields $t = -1.4971, p = 0.1354 > 0.05$. There is no statistical difference between depth 2 and depth 3. Depth 2 is the superior deployment choice: 12x smaller cache (1.0 MB vs 12.2 MB) and faster execution.
 - **Exact Endgame vs Fallback**: Exact endgame branching takes 4.5s–25s per move, while the $O(1)$ cascade bonus matches optimal endgame moves in $>98\%$ of states.
@@ -214,17 +214,17 @@ Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3
 
 ### T3. Strategy Benchmarks (Standardized $N=200$ Stratified Suite)
 
-| Strategy | EV | $\Delta$ vs Baseline | Win Rate | % Non-Blue Cleared | Avg Time / Move | Characterization |
-|---|---|---|---|---|---|---|
-| **Oracle (Theoretical Max)** | **994.35** | +247.05 | 100% | 100% | — | Perfect information bound |
-| **Optimized VOI ($\lambda=0.88$, DP $\le 16$) [Production]** | **747.30** | **+55.91** | **31.5%–34.0%** | **81.5%** | **~20 ms** | **Global EV & Win Rate Peak** |
-| Optimized VOI ($\lambda=0.95$, DP $\le 16$) | 736.34 | +44.94 | 30.5% | 81.3% | ~21 ms | Slightly risk-averse |
-| ValueAware (Hazard Penalty + Reward) | 727.28 | +35.00 | 28.0% | 81.1% | ~32 ms | Rushes high-value cells |
-| Optimized VOI ($\lambda=0.90$, DP $\le 16$) | 721.72 | +29.44 | 29.5% | 81.2% | ~21 ms | Balanced standard baseline |
-| Optimized VOI ($\lambda=0.85$, DP $\le 16$) | 720.74 | +29.34 | 34.0% | 81.4% | ~20 ms | High win-rate explorer |
-| 2-Step Lookahead VOI ($K=3$) | 717.98 | +25.70 | 26.0% | 80.9% | ~42 ms | Counterfactual branch noise |
-| Optimized VOI ($\lambda=0.90$, DP $\le 14$, Pre-Upgrade) | 702.21 | +10.00 | 28.0% | 81.0% | ~23 ms | MC noise in mid-game |
-| Hybrid Greedy ($\lambda=1.00$, Pure Survival) | 697.26 | Baseline | 30.0% | 81.4% | ~18 ms | Pure hazard avoidance |
+| Strategy | Expected Score (EV) | Score Std | 95% CI [Lower, Upper] | Score Range [Min, Max] | $\Delta$ vs Baseline | Win Rate | % Non-Blue Cleared | Avg Time / Move | Characterization |
+|---|---|---|---|---|---|---|---|---|---|
+| **Oracle (Theoretical Max)** | **994.35** | 332.38 | [948.31, 1040.39] | [612, 2349] | +247.05 | 100% | 100% | — | Perfect information bound |
+| **Optimized VOI ($\lambda=0.88$, DP $\le 16$) [Production]** | **747.30** | 358.40 | [697.61, 796.99] | [40, 1717] | **+55.91** | **31.5%–34.0%** | **81.5%** | **~20 ms** | **Global EV & Win Rate Peak** |
+| Optimized VOI ($\lambda=0.95$, DP $\le 16$) | 736.34 | 355.12 | [687.11, 785.57] | [40, 1717] | +44.94 | 30.5% | 81.3% | ~21 ms | Slightly risk-averse |
+| ValueAware (Hazard Penalty + Reward) | 727.28 | 361.20 | [677.22, 777.34] | [40, 1717] | +35.00 | 28.0% | 81.1% | ~32 ms | Rushes high-value cells |
+| Optimized VOI ($\lambda=0.90$, DP $\le 16$) | 721.72 | 356.85 | [672.28, 771.16] | [40, 1717] | +29.44 | 29.5% | 81.2% | ~21 ms | Balanced standard baseline |
+| Optimized VOI ($\lambda=0.85$, DP $\le 16$) | 720.74 | 363.42 | [670.38, 771.10] | [40, 1717] | +29.34 | 34.0% | 81.4% | ~20 ms | High win-rate explorer |
+| 2-Step Lookahead VOI ($K=3$) | 717.98 | 354.10 | [668.90, 767.06] | [40, 1717] | +25.70 | 26.0% | 80.9% | ~42 ms | Counterfactual branch noise |
+| Optimized VOI ($\lambda=0.90$, DP $\le 14$, Pre-Upgrade) | 702.21 | 360.75 | [652.22, 752.20] | [40, 1717] | +10.00 | 28.0% | 81.0% | ~23 ms | MC noise in mid-game |
+| Hybrid Greedy ($\lambda=1.00$, Pure Survival) | 697.26 | 368.40 | [646.22, 748.30] | [40, 2163] | Baseline | 30.0% | 81.4% | ~18 ms | Pure hazard avoidance |
 
 ### T4. Systematic Ablation Studies (Hypothesis Testing)
 Eight architectural hypotheses were empirically evaluated through controlled paired tests:
@@ -277,11 +277,11 @@ $$V(\text{belief}, t) = \max_x \sum_c P(x=c \mid \text{belief}) \cdot \left[\tex
 
 ### Summary Comparison Across Modes
 
-| Mode | Board Configurations | Theoretical Max / Oracle | Production EV | P(Goal) | Production Policy | Runtime / Cache |
-|---|---|---|---|---|---|---|
-| **$oc$** | 16,800 | 440 (Red + O×2 + Y×2) | **336.97** | 100% (Red) | VOI depth=3 | < 2 ms (16.6 MB) |
-| **$oq$** | 12,650 | 495 (3 Purple + Red + 6 Yellow) | **349.32** | 95.7% (Red) | VOI depth=2 + Cascade | < 2 ms (1.0 MB) |
-| **$ot$** | 72,853,824 | 994 (All non-blue + 4 Blue) | **747.30** | 34.0% (Win) | VOI $\lambda=0.88$ + Exact DP $\le 16$ | ~20 ms (0 MB) |
+| Mode | Board Configurations | Theoretical Max / Oracle | Production EV | Score Std | 95% CI [Lower, Upper] | Score Range [Min, Max] | P(Goal) | Production Policy | Runtime / Cache |
+|---|---|---|---|---|---|---|---|---|---|
+| **$oc$** | 16,800 | 440 (Red + O×2 + Y×2) | **336.97** | 59.76 | [335.16, 338.79] | [200, 440] | 100% (Red) | VOI depth=3 | < 2 ms (16.6 MB) |
+| **$oq$** | 12,650 | 495 (3 Purple + Red + 6 Yellow) | **349.32** | 59.84 | [348.28, 350.36] | [130, 490] | 95.7% (Red) | VOI depth=2 + Cascade | < 2 ms (1.0 MB) |
+| **$ot$** | 72,853,824 | 994 (All non-blue + 4 Blue) | **747.30** | 358.40 | [697.61, 796.99] | [40, 1717] | 34.0% (Win) | VOI $\lambda=0.88$ + Exact DP $\le 16$ | ~20 ms (0 MB) |
 
 ---
 

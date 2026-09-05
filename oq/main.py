@@ -118,11 +118,16 @@ def main():
                       max_score=('score', 'max'),
                       p_find_red=('found_red', 'mean'),
                       mean_paid_clicks=('paid_clicks_used', 'mean'),
-                      mean_purples=('purples_clicked', 'mean')))
+                      mean_purples=('purples_clicked', 'mean'),
+                      n_boards=('score', 'count')))
+    summary['se_score'] = summary['std_score'] / np.sqrt(summary['n_boards'])
+    summary['ci_lower'] = summary['mean_score'] - 1.96 * summary['se_score']
+    summary['ci_upper'] = summary['mean_score'] + 1.96 * summary['se_score']
     summary = summary.sort_values('mean_score', ascending=False)
 
     print("\n=== OQ Summary ===")
-    print(summary.round(2).to_string(index=False))
+    cols_display = ['strategy', 'mean_score', 'std_score', 'ci_lower', 'ci_upper', 'min_score', 'max_score', 'p_find_red']
+    print(summary[cols_display].round(2).to_string(index=False))
 
 
 if __name__ == '__main__':

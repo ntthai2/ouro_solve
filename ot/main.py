@@ -45,14 +45,23 @@ def main():
     print(f"Oracle EV (Theoretical Max): {avg_oracle_ev:.2f}\n")
     
     # Prepare table format
-    print(f"{'Strategy':<35} | {'EV':<8} | {'% Oracle':<8} | {'Win Rate':<9} | {'% Non-Blue (Loss)':<18} | {'Blue Clicks (Win)':<18}")
-    print("-" * 110)
+    print(f"{'Strategy':<35} | {'EV':<8} | {'Std':<7} | {'95% CI':<17} | {'Range':<11} | {'% Oracle':<8} | {'Win Rate':<9} | {'% Non-Blue':<10}")
+    print("-" * 125)
     
     for strat in strategies:
         strat_name = strat.name
         strat_df = df[df['strategy'] == strat_name]
         
-        avg_score = strat_df['score'].mean()
+        scores = strat_df['score'].values
+        n_strat = len(scores)
+        avg_score = float(np.mean(scores))
+        std_score = float(np.std(scores, ddof=1)) if n_strat > 1 else 0.0
+        se_score = std_score / np.sqrt(n_strat) if n_strat > 0 else 0.0
+        ci_l = avg_score - 1.96 * se_score
+        ci_u = avg_score + 1.96 * se_score
+        min_s = float(np.min(scores)) if n_strat > 0 else 0.0
+        max_s = float(np.max(scores)) if n_strat > 0 else 0.0
+
         win_rate = strat_df['win'].mean() * 100
         
         loss_df = strat_df[strat_df['win'] == False]
@@ -68,8 +77,10 @@ def main():
         avg_blue_clicks_when_win = win_df['blue_clicks'].mean() if len(win_df) > 0 else 0.0
         
         pct_oracle = (avg_score / avg_oracle_ev) * 100
+        ci_str = f"[{ci_l:.1f}, {ci_u:.1f}]"
+        rng_str = f"[{min_s:.0f}, {max_s:.0f}]"
         
-        print(f"{strat_name:<35} | {avg_score:<8.2f} | {pct_oracle:>6.2f}% | {win_rate:>6.2f}%   | {avg_non_blue_percent_when_loss:>16.2f}% | {avg_blue_clicks_when_win:>16.2f}")
+        print(f"{strat_name:<35} | {avg_score:<8.2f} | {std_score:<7.2f} | {ci_str:<17} | {rng_str:<11} | {pct_oracle:>6.2f}% | {win_rate:>6.2f}%   | {avg_non_blue_percent_when_loss:>9.2f}%")
         if total_losses > 1:
             print(f"    Loss distribution -> Early (>15 left): {loss_early/total_losses*100:.1f}%, Mid (9-15 left): {loss_mid/total_losses*100:.1f}%, Late (<=8 left): {loss_late/total_losses*100:.1f}%")
 

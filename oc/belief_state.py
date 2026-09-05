@@ -8,6 +8,16 @@ LightBeliefState  — tracks only which cells are valid red candidates.
 
 FullBeliefState   — tracks the full set of consistent board indices.
                     Used by POMDP and VOI greedy.
+
+Speed optimisations vs original:
+- FullBeliefState stores `_idx_arr` (np.int32 array) alongside `board_indices`
+  (frozenset), eliminating the repeated frozenset → list → np.array conversion
+  that was the hot path in update(), p_color(), expected_reward(), possible_colors().
+- `_idx_arr` is computed once at construction and reused by all query methods.
+- `update()` builds the filtered array directly with boolean indexing, then
+  derives `board_indices` from it (frozenset only needed for memoisation keys).
+- `_red_candidates_after_reveal` precomputes geometry sets once per cell to
+  avoid reconstructing them inside set comprehensions.
 """
 
 from __future__ import annotations
@@ -20,6 +30,20 @@ from oc.board_generator import (
     rc, immediate_neighbors, full_diagonal_cells, same_row_col_cells,
 )
 
+# ── Precompute geometry sets for all cells once at import time ────────────────
+
+_IMMEDIATE_NEIGHBORS: List[FrozenSet[int]] = [
+    frozenset(immediate_neighbors(c)) for c in range(NUM_CELLS)
+]
+_FULL_DIAGONAL_CELLS: List[FrozenSet[int]] = [
+    frozenset(full_diagonal_cells(c)) for c in range(NUM_CELLS)
+]
+_ROW_COL_CELLS: List[FrozenSet[int]] = [
+    frozenset(same_row_col_cells(c)) for c in range(NUM_CELLS)
+]
+# Precompute (row, col) for each cell
+_RC: List[tuple] = [rc(c) for c in range(NUM_CELLS)]
+
 # ── deduction: given a revealed cell and color, which cells can still be red? ─
 
 def _red_candidates_after_reveal(revealed_cell: int, color: int,
@@ -27,45 +51,36 @@ def _red_candidates_after_reveal(revealed_cell: int, color: int,
     """
     Apply deduction rules to filter red candidates.
     Always removes revealed_cell and CENTER from candidates.
+    Uses precomputed geometry sets for O(1) lookup.
     """
-    r, c = rc(revealed_cell)
     cands = set(current_candidates)
     cands.discard(revealed_cell)
     cands.discard(CENTER)
 
     if color == COLOR_ORANGE:
-        # red is an immediate neighbor of revealed cell
-        valid = set(immediate_neighbors(revealed_cell))
-        cands &= valid
+        cands &= _IMMEDIATE_NEIGHBORS[revealed_cell]
 
     elif color == COLOR_YELLOW:
-        # red is on the full diagonal lines of revealed cell
-        valid = set(full_diagonal_cells(revealed_cell))
-        cands &= valid
+        cands &= _FULL_DIAGONAL_CELLS[revealed_cell]
 
     elif color == COLOR_GREEN:
-        # red shares row or column with revealed cell
-        rv, cv = rc(revealed_cell)
-        cands = {p for p in cands
-                 if rc(p)[0] == rv or rc(p)[1] == cv}
+        rv, cv = _RC[revealed_cell]
+        cands = {p for p in cands if _RC[p][0] == rv or _RC[p][1] == cv}
 
     elif color == COLOR_TEAL:
-        # red shares row, col, or diagonal with revealed cell
-        rv, cv = rc(revealed_cell)
+        rv, cv = _RC[revealed_cell]
         cands = {p for p in cands
-                 if rc(p)[0] == rv
-                 or rc(p)[1] == cv
-                 or abs(rc(p)[0] - rv) == abs(rc(p)[1] - cv)}
+                 if _RC[p][0] == rv
+                 or _RC[p][1] == cv
+                 or abs(_RC[p][0] - rv) == abs(_RC[p][1] - cv)}
 
     elif color == COLOR_BLUE:
-        # red shares NOTHING with revealed cell
-        rv, cv = rc(revealed_cell)
+        rv, cv = _RC[revealed_cell]
         cands = {p for p in cands
-                 if rc(p)[0] != rv
-                 and rc(p)[1] != cv
-                 and abs(rc(p)[0] - rv) != abs(rc(p)[1] - cv)}
+                 if _RC[p][0] != rv
+                 and _RC[p][1] != cv
+                 and abs(_RC[p][0] - rv) != abs(_RC[p][1] - cv)}
 
-    # COLOR_RED: red is found, candidate set collapses to revealed_cell
     elif color == COLOR_RED:
         cands = {revealed_cell}
 
@@ -130,6 +145,10 @@ class FullBeliefState:
     Tracks the full set of consistent board indices.
     Used by POMDP and VOI greedy.
     Requires ALL_BOARDS to be loaded once at module level.
+
+    Key optimisation: stores `_idx_arr` (np.int32) once per state so that
+    p_color(), expected_reward(), possible_colors(), and update() can use
+    vectorised NumPy operations directly without frozenset→list→array conversion.
     """
 
     # class-level board array and weights, set once via FullBeliefState.load_boards()
@@ -144,51 +163,56 @@ class FullBeliefState:
         if weights is not None:
             cls.ALL_WEIGHTS = weights
         else:
-            # uniform over boards (biased — only use for testing)
             cls.ALL_WEIGHTS = np.ones(len(boards), dtype=np.float64) / len(boards)
 
     def __init__(self, board_indices: FrozenSet[int] = None,
-                 revealed: FrozenSet[int] = None):
+                 revealed: FrozenSet[int] = None,
+                 _idx_arr: np.ndarray = None):
         if board_indices is None:
             board_indices = frozenset(range(self.NUM_BOARDS))
         self.board_indices: FrozenSet[int] = board_indices
         self.revealed:      FrozenSet[int] = revealed or frozenset()
 
+        # Cache the numpy index array — built once, reused by all query methods
+        if _idx_arr is not None:
+            self._idx_arr = _idx_arr
+        else:
+            self._idx_arr = np.array(sorted(board_indices), dtype=np.int32)
+
     def update(self, cell: int, color: int) -> FullBeliefState:
         """Filter to boards consistent with observing color at cell."""
-        boards = self.ALL_BOARDS
-        idx_arr = np.array(list(self.board_indices), dtype=np.int32)
-        mask = boards[idx_arr, cell] == color
-        new_indices = frozenset(idx_arr[mask].tolist())
+        mask = self.ALL_BOARDS[self._idx_arr, cell] == color
+        new_arr = self._idx_arr[mask]
+        new_indices = frozenset(new_arr.tolist())
         new_revealed = self.revealed | {cell}
-        return FullBeliefState(new_indices, new_revealed)
+        return FullBeliefState(new_indices, new_revealed, _idx_arr=new_arr)
 
     def p_color(self, cell: int, color: int) -> float:
         """P(cell = color | current belief) under weighted board distribution."""
-        if not self.board_indices:
+        if self._idx_arr.size == 0:
             return 0.0
-        idx_arr = np.array(list(self.board_indices), dtype=np.int32)
-        w = self.ALL_WEIGHTS[idx_arr]
+        w = self.ALL_WEIGHTS[self._idx_arr]
         w = w / w.sum()
-        mask = self.ALL_BOARDS[idx_arr, cell] == color
+        mask = self.ALL_BOARDS[self._idx_arr, cell] == color
         return float(w[mask].sum())
 
     def expected_reward(self, cell: int) -> float:
         """Expected immediate reward from clicking cell under weighted distribution."""
-        if not self.board_indices:
+        if self._idx_arr.size == 0:
             return 0.0
-        idx_arr = np.array(list(self.board_indices), dtype=np.int32)
-        w = self.ALL_WEIGHTS[idx_arr]
+        w = self.ALL_WEIGHTS[self._idx_arr]
         w = w / w.sum()
-        rewards = np.array([COLOR_VALUES[c] for c in self.ALL_BOARDS[idx_arr, cell]])
+        colors_at_cell = self.ALL_BOARDS[self._idx_arr, cell]
+        rewards = np.empty(len(colors_at_cell), dtype=np.float64)
+        cv = np.array(COLOR_VALUES, dtype=np.float64)
+        rewards = cv[colors_at_cell]
         return float((rewards * w).sum())
 
     def possible_colors(self, cell: int) -> List[int]:
         """Colors that appear at cell in at least one consistent board."""
-        if not self.board_indices:
+        if self._idx_arr.size == 0:
             return []
-        idx_arr = np.array(list(self.board_indices), dtype=np.int32)
-        return list(np.unique(self.ALL_BOARDS[idx_arr, cell]))
+        return list(np.unique(self.ALL_BOARDS[self._idx_arr, cell]))
 
     def unclicked(self) -> FrozenSet[int]:
         return frozenset(range(NUM_CELLS)) - self.revealed
@@ -198,10 +222,9 @@ class FullBeliefState:
 
     def red_candidates(self) -> FrozenSet[int]:
         """Cells where red could still be, derived from consistent boards."""
-        if not self.board_indices:
+        if self._idx_arr.size == 0:
             return frozenset()
-        idx_arr = np.array(list(self.board_indices), dtype=np.int32)
-        red_positions = self.ALL_BOARDS[idx_arr, :] == COLOR_RED
+        red_positions = self.ALL_BOARDS[self._idx_arr, :] == COLOR_RED
         possible_red_cells = np.where(red_positions.any(axis=0))[0]
         return frozenset(possible_red_cells.tolist())
 
