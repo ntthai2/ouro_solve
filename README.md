@@ -26,7 +26,8 @@ open guide.html         # Open in browser (or visit http://localhost:7734)
   - **Total EV & Immediate EV**: Expected immediate points vs. long-term lookahead value.
   - **Information Gain**: Shannon entropy reduction (bits) for $oc$ / candidate elimination for $oq$ / expected new safe cells for $ot$.
   - **Posterior Probabilities**: Exact $P(\text{color})$ distribution, reward value, and remaining unseen count.
-  - **Runner-Up Comparison**: Exact EV delta between the recommended move and alternatives.
+  - **Runner-Up Comparison**: Exact EV delta between the recommended move and alternatives (with co-optimal tie detection).
+- **100% Deterministic Recommendations**: Canonical candidate cell ordering and deterministic state-seeded sampling ensure identical output across repeated queries with full `/state` and `/explain` endpoint synchronization.
 - **Auto-Reveal 100% Certain Cells**: When a cell's color is uniquely constrained ($P = 1.0$), clicking it records the reveal immediately without opening the color picker.
 
 ---
@@ -200,7 +201,7 @@ Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3
    - *Phase 3 (1-Step Calibrated VOI Screening)*: Scores remaining candidate cells by balancing hazard cost vs expected constraint resolution:
      $$\text{Score}(c) = -\lambda \cdot P(\text{Blue}) + (1 - \lambda) \cdot \mathbb{E}[\text{New Certain Safe Cells}]$$
      - **Exact Bitmask DP** (`FastCounterTwoPass`): Active for $U \le 16$ unrevealed cells (< 10 ms, 0% MC noise).
-     - **Monte Carlo Sampling**: 3,500 samples for $U \ge 17$ (~20 ms).
+     - **Monte Carlo Sampling**: 3,500 samples for $U \ge 17$ (~20 ms), deterministically seeded by belief state hash to ensure 100% reproducible recommendations across repeated queries.
    - *Phase 4 (Dynamic Endgame Lookahead)*: When $U \le 10$, expands to Top-3 2-step lookahead (+8.40 pts EV).
 2. **Hybrid Greedy Strategy ($\lambda=1.00$, Baseline)**:
    - *Mechanism*: Phase 1 safe cells $\to$ Phase 2 selects the cell with absolute minimum $P(\text{Blue})$.
@@ -262,7 +263,10 @@ Eight architectural hypotheses were empirically evaluated through controlled pai
 ### POMDP Formulation & Split-Key Architecture
 Each game is modeled as a Partially Observable Markov Decision Process (POMDP):
 $$V(\text{belief}, t) = \max_x \sum_c P(x=c \mid \text{belief}) \cdot \left[\text{Reward}(c) + V(\text{Update}(\text{belief}, x, c), t-1)\right]$$
-- **Split-Key Memoization**: Value memo on `(board_indices, clicks_left)` allows computational sharing across intersecting paths. Policy memo on `(board_indices, revealed, clicks_left)` ensures recommended cells are unrevealed in the active game. Eliminates cell re-visitation bugs (which caused artificial scores $> 600$ during early development).
+- **Split-Key Memoization**: Value memo keyed by `(board_indices, clicks_left, remaining_depth)` allows computational sharing across intersecting paths while isolating search horizons to prevent shallow-tree caching from polluting deeper lookahead branches. Policy memo on `(board_indices, revealed, clicks_left)` ensures recommended cells are unrevealed in the active game, eliminating cell re-visitation bugs.
+- **Strict Deterministic Tie-Breaking & Consistency**: Candidate cells are evaluated in canonical sorted order with numerical tolerance ($\epsilon = 10^{-9}$) on score differences. In symmetric co-optimal states (e.g., {B1, E2, D5, A4} in $oc$ or {C2, B3, D3, C4} in $oq$), the engine breaks ties deterministically rather than relying on arbitrary hash iteration orders.
+- **State-Seeded Monte Carlo ($ot$)**: For $ot$ configurations with $U \ge 17$ where exact DP is intractable under latency limits, the 3,500-sample Monte Carlo estimator seeds its PRNG deterministically from the hash of the revealed board state, ensuring 100% reproducible recommendations across repeated evaluations without sacrificing sample diversity across moves.
+- **Server API Synchronization**: `/state` and `/explain` endpoints are strictly synchronized: `/state` recommendation is guaranteed to match the rank-1 move in `/explain`, and runner-up deltas are calculated as $\Delta = \max(0.0, V_{\text{rec}} - V_{\text{runner}})$ with explicit `is_tie: true` signaling for co-optimal symmetries.
 
 ### Empirical Validation ($ot$ 16 Real Games)
 - **Rare Distribution**: Across 16 recorded games, $m_{\text{extra}}=1$ appeared in 12 games (75.0%), and $m_{\text{extra}}=2$ in 4 games (25.0%).

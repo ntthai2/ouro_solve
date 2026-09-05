@@ -94,11 +94,11 @@ class ExactPOMDP:
 
         best_value = -1.0
         best_cell  = -1
-        unclicked  = list(belief.unclicked())
+        unclicked  = sorted(list(belief.unclicked()))
 
         for cell in unclicked:
             ev = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
@@ -107,7 +107,7 @@ class ExactPOMDP:
                 future     = self.value(new_belief, clicks_left - 1)
                 ev        += p * (reward + future)
 
-            if ev > best_value:
+            if ev > best_value + 1e-9:
                 best_value = ev
                 best_cell  = cell
 
@@ -122,7 +122,7 @@ class ExactPOMDP:
             self.value(belief, clicks_left)
         cell = self._policy_memo.get(pkey, -1)
         if cell == -1 or cell in belief.revealed:
-            unclicked = list(belief.unclicked())
+            unclicked = sorted(list(belief.unclicked()))
             return unclicked[0] if unclicked else 0
         return cell
 
@@ -145,7 +145,7 @@ class VOIGreedy:
         immediate_expected_reward + expected_future_value
 
     Future value estimated via lookahead up to `depth` steps.
-    Uses split memo keys — value on (board_indices, clicks_left),
+    Uses split memo keys — value on (board_indices, clicks_left, remaining_depth),
     policy on (board_indices, revealed, clicks_left).
     """
 
@@ -155,8 +155,10 @@ class VOIGreedy:
         self._value_memo:  Dict[Tuple, float] = {}
         self._policy_memo: Dict[Tuple, int]   = {}
 
-    def _vkey(self, belief: FullBeliefState, clicks_left: int) -> Tuple:
-        return (belief.key(), clicks_left)
+    def _vkey(self, belief: FullBeliefState, clicks_left: int, remaining_depth: int = None) -> Tuple:
+        if remaining_depth is None:
+            return (belief.key(), clicks_left)
+        return (belief.key(), clicks_left, remaining_depth)
 
     def _pkey(self, belief: FullBeliefState, clicks_left: int) -> Tuple:
         return (belief.key(), belief.revealed, clicks_left)
@@ -180,17 +182,22 @@ class VOIGreedy:
         if current_depth >= self.depth:
             return self._approx_future(belief, clicks_left)
 
-        vkey = self._vkey(belief, clicks_left)
+        remaining_depth = self.depth - current_depth
+        vkey_d = self._vkey(belief, clicks_left, remaining_depth)
+        vkey_legacy = self._vkey(belief, clicks_left)
         pkey = self._pkey(belief, clicks_left)
 
-        if vkey in self._value_memo and pkey in self._policy_memo:
-            return self._value_memo[vkey]
+        if vkey_d in self._value_memo and pkey in self._policy_memo:
+            return self._value_memo[vkey_d]
+        if vkey_legacy in self._value_memo and pkey in self._policy_memo:
+            return self._value_memo[vkey_legacy]
 
-        best_value = 0.0
+        best_value = -1.0
         best_cell  = -1
-        for cell in belief.unclicked():
+        unclicked = sorted(list(belief.unclicked()))
+        for cell in unclicked:
             ev = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
@@ -199,11 +206,12 @@ class VOIGreedy:
                 future     = self._value(new_belief, clicks_left - 1,
                                          current_depth + 1)
                 ev        += p * (reward + future)
-            if ev > best_value:
+            if ev > best_value + 1e-9:
                 best_value = ev
                 best_cell  = cell
 
-        self._value_memo[vkey]  = best_value
+        self._value_memo[vkey_d] = best_value
+        self._value_memo[vkey_legacy] = best_value
         self._policy_memo[pkey] = best_cell
         return best_value
 
@@ -221,7 +229,7 @@ class VOIGreedy:
             self._value(belief, clicks_left, current_depth=0)
         cell = self._policy_memo.get(pkey, -1)
         if cell == -1 or cell in belief.revealed:
-            unclicked = list(belief.unclicked())
+            unclicked = sorted(list(belief.unclicked()))
             return unclicked[0] if unclicked else 0
         return cell
 
@@ -266,15 +274,15 @@ class EntropyMinimization:
 
         best_h    = float('inf')
         best_cell = -1
-        for cell in belief.unclicked():
+        for cell in sorted(list(belief.unclicked())):
             h = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
                 k = len(belief.as_light().update(cell, color).candidates)
                 h += p * (math.log2(k) if k > 0 else 0.0)
-            if h < best_h:
+            if h < best_h - 1e-9:
                 best_h    = h
                 best_cell = cell
         return best_cell
@@ -329,31 +337,31 @@ class CandidateHalving:
 
         # red found and clicked — pivot to highest-value unclicked cell
         if light.is_red_found():
-            unclicked = list(belief.unclicked())
+            unclicked = sorted(list(belief.unclicked()))
             if not unclicked:
                 return 0
-            return max(unclicked, key=lambda c: belief.expected_reward(c))
+            return max(unclicked, key=lambda c: (belief.expected_reward(c), -c))
 
         # red located but not yet clicked — click it immediately
         if light.is_red_located():
             only = next(iter(light.candidates))
             if only not in belief.revealed:
                 return only
-            unclicked = list(belief.unclicked())
+            unclicked = sorted(list(belief.unclicked()))
             if not unclicked:
                 return 0
-            return max(unclicked, key=lambda c: belief.expected_reward(c))
+            return max(unclicked, key=lambda c: (belief.expected_reward(c), -c))
 
         best_score = float('inf')
         best_cell  = -1
-        for cell in belief.unclicked():
+        for cell in sorted(list(belief.unclicked())):
             score = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
                 score += p * len(belief.as_light().update(cell, color).candidates)
-            if score < best_score:
+            if score < best_score - 1e-9:
                 best_score = score
                 best_cell  = cell
         return best_cell

@@ -142,10 +142,10 @@ class GameState:
                 poss = self.belief.possible_colors(i)
                 certain_col = int(poss[0]) if len(poss) == 1 else -1
 
-                if i == OC_CENTER and self.clicks_left == MAX_CLICKS:
-                    st = "center"
-                elif i == rec:
+                if i == rec:
                     st = "recommended"
+                elif i == OC_CENTER and self.clicks_left == MAX_CLICKS:
+                    st = "center"
                 elif i in candidates:
                     st = "candidate"
                 else:
@@ -475,14 +475,14 @@ def explain_oc(belief, clicks_left, target_cell=None):
     rec = oc_policy(belief, clicks_left)
     cell = rec if target_cell is None or target_cell < 0 else target_cell
 
-    unclicked = list(belief.unclicked())
+    unclicked = sorted(list(belief.unclicked()))
     if cell not in unclicked and unclicked:
         cell = unclicked[0]
 
     scores = []
     for c in unclicked:
         ev = 0.0
-        for color in belief.possible_colors(c):
+        for color in sorted(belief.possible_colors(c)):
             p = belief.p_color(c, color)
             if p == 0.0:
                 continue
@@ -491,7 +491,7 @@ def explain_oc(belief, clicks_left, target_cell=None):
             future = oc_policy._value(new_b, clicks_left - 1, current_depth=1)
             ev += p * (reward + future)
         scores.append((float(ev), int(c)))
-    scores.sort(key=lambda x: x[0], reverse=True)
+    scores.sort(key=lambda x: (round(x[0], 6), -x[1]), reverse=True)
 
     breakdown = []
     imm_ev = 0.0
@@ -510,7 +510,7 @@ def explain_oc(belief, clicks_left, target_cell=None):
     else:
         h_curr = 0.0
 
-    for color in belief.possible_colors(cell):
+    for color in sorted(belief.possible_colors(cell)):
         p = float(belief.p_color(cell, color))
         if p == 0.0:
             continue
@@ -550,20 +550,35 @@ def explain_oc(belief, clicks_left, target_cell=None):
 
     info_gain = max(0.0, h_curr - exp_h_post)
 
+    target_total_ev = next((s for s, c in scores if c == cell), 0.0)
     runner_up = None
-    for s, c in scores:
-        if c != cell:
-            col_letter = chr(ord("A") + (c % 5))
-            row_num = (c // 5) + 1
-            runner_up = {
-                "cell": int(c),
-                "label": f"{col_letter}{row_num}",
-                "total_ev": round(s, 2),
-                "diff": round(scores[0][0] - s, 2),
-            }
-            break
+    if cell == rec:
+        for s, c in scores:
+            if c != cell:
+                col_letter = chr(ord("A") + (c % 5))
+                row_num = (c // 5) + 1
+                diff_val = round(target_total_ev - s, 2)
+                runner_up = {
+                    "cell": int(c),
+                    "label": f"{col_letter}{row_num}",
+                    "total_ev": round(s, 2),
+                    "diff": max(0.0, diff_val),
+                    "is_tie": abs(diff_val) < 1e-4,
+                }
+                break
+    else:
+        rec_ev = next((s for s, c in scores if c == rec), scores[0][0])
+        col_letter = chr(ord("A") + (rec % 5))
+        row_num = (rec // 5) + 1
+        diff_val = round(rec_ev - target_total_ev, 2)
+        runner_up = {
+            "cell": int(rec),
+            "label": f"{col_letter}{row_num}",
+            "total_ev": round(rec_ev, 2),
+            "diff": max(0.0, diff_val),
+            "is_tie": abs(diff_val) < 1e-4,
+        }
 
-    target_total_ev = scores[0][0] if cell == rec else next((s for s, c in scores if c == cell), 0.0)
     col_letter = chr(ord("A") + (cell % 5))
     row_num = (cell // 5) + 1
 
@@ -594,7 +609,7 @@ def explain_oq(game: OQGame, target_cell=None):
 
     cell = rec if target_cell is None or target_cell < 0 else target_cell
 
-    unclicked = list(belief.unclicked())
+    unclicked = sorted(list(belief.unclicked()))
     if cell not in unclicked and unclicked:
         cell = unclicked[0]
 
@@ -605,7 +620,7 @@ def explain_oq(game: OQGame, target_cell=None):
     scores = []
     for c in unclicked:
         ev = 0.0
-        for color in belief.possible_colors(c):
+        for color in sorted(belief.possible_colors(c)):
             p = belief.p_color(c, color)
             if p == 0.0:
                 continue
@@ -623,14 +638,14 @@ def explain_oq(game: OQGame, target_cell=None):
                     future = oq_policy._value(new_b, clicks_left - 1, current_depth=1)
             ev += p * (reward + future)
         scores.append((float(ev), int(c)))
-    scores.sort(key=lambda x: x[0], reverse=True)
+    scores.sort(key=lambda x: (round(x[0], 6), -x[1]), reverse=True)
 
     breakdown = []
     imm_ev = 0.0
     exp_boards_elim = 0.0
     exp_purple_cands = 0.0
 
-    for color in belief.possible_colors(cell):
+    for color in sorted(belief.possible_colors(cell)):
         p = float(belief.p_color(cell, color))
         if p == 0.0:
             continue
@@ -667,23 +682,38 @@ def explain_oq(game: OQGame, target_cell=None):
             "candidates_left": cands_left,
         })
 
+    target_total_ev = next((s for s, c in scores if c == cell), 0.0)
     runner_up = None
-    for s, c in scores:
-        if c != cell:
-            col_letter = chr(ord("A") + (c % 5))
-            row_num = (c // 5) + 1
-            runner_up = {
-                "cell": int(c),
-                "label": f"{col_letter}{row_num}",
-                "total_ev": round(s, 2),
-                "diff": round(scores[0][0] - s, 2),
-            }
-            break
+    if cell == rec:
+        for s, c in scores:
+            if c != cell:
+                col_letter = chr(ord("A") + (c % 5))
+                row_num = (c // 5) + 1
+                diff_val = round(target_total_ev - s, 2)
+                runner_up = {
+                    "cell": int(c),
+                    "label": f"{col_letter}{row_num}",
+                    "total_ev": round(s, 2),
+                    "diff": max(0.0, diff_val),
+                    "is_tie": abs(diff_val) < 1e-4,
+                }
+                break
+    else:
+        rec_ev = next((s for s, c in scores if c == rec), scores[0][0])
+        col_letter = chr(ord("A") + (rec % 5))
+        row_num = (rec // 5) + 1
+        diff_val = round(rec_ev - target_total_ev, 2)
+        runner_up = {
+            "cell": int(rec),
+            "label": f"{col_letter}{row_num}",
+            "total_ev": round(rec_ev, 2),
+            "diff": max(0.0, diff_val),
+            "is_tie": abs(diff_val) < 1e-4,
+        }
 
     curr_cands = len(belief.possible_purple_cells() - belief.revealed)
     cands_elim = max(0.0, curr_cands - exp_purple_cands)
 
-    target_total_ev = scores[0][0] if cell == rec else next((s for s, c in scores if c == cell), 0.0)
     col_letter = chr(ord("A") + (cell % 5))
     row_num = (cell // 5) + 1
 
@@ -704,12 +734,13 @@ def explain_oq(game: OQGame, target_cell=None):
         "runner_up": runner_up,
     }
 
+
 def explain_ot(game: OTGame, target_cell=None):
     belief = game.belief
     rec = game.recommend()
     cell = rec if target_cell is None or target_cell < 0 else target_cell
     
-    remaining = [c for c in range(OT_NUM_CELLS) if c not in game.clicked_cells]
+    remaining = sorted([c for c in range(OT_NUM_CELLS) if c not in game.clicked_cells])
     if cell not in remaining and remaining:
         cell = remaining[0]
         
@@ -719,7 +750,7 @@ def explain_ot(game: OTGame, target_cell=None):
     e_info = 0.0
     breakdown = []
     
-    for c, p_c_list in probs.items():
+    for c, p_c_list in sorted(probs.items()):
         p_c = p_c_list[cell]
         if p_c > 0:
             if c != OT_COLOR_BLUE:
@@ -752,7 +783,7 @@ def explain_ot(game: OTGame, target_cell=None):
         c_p_blue = probs[OT_COLOR_BLUE][c]
         c_e_info = 0.0
         if ot_policy.lam < 1.0 or zero_risk_cells:
-            for color_id, p_c_list in probs.items():
+            for color_id, p_c_list in sorted(probs.items()):
                 if color_id != OT_COLOR_BLUE:
                     p_c = p_c_list[c]
                     if p_c > 0:
@@ -762,7 +793,7 @@ def explain_ot(game: OTGame, target_cell=None):
                         c_e_info += p_c * len(v_ns)
         c_score = -ot_policy.lam * c_p_blue + (1.0 - ot_policy.lam) * c_e_info
         scores.append((float(c_score), int(c)))
-    scores.sort(key=lambda x: x[0], reverse=True)
+    scores.sort(key=lambda x: (round(x[0], 6), -x[1]), reverse=True)
     
     runner_up = None
     if scores:
@@ -771,22 +802,26 @@ def explain_ot(game: OTGame, target_cell=None):
                 if c_cand != cell:
                     c_col = chr(ord("A") + (c_cand % 5))
                     c_row = (c_cand // 5) + 1
+                    diff_val = round(target_total_score - s_val, 4)
                     runner_up = {
                         "cell": int(c_cand),
                         "label": f"{c_col}{c_row}",
-                        "total_ev": round(s_val, 2),
-                        "diff": round(scores[0][0] - s_val, 2),
+                        "total_ev": round(s_val, 4),
+                        "diff": max(0.0, diff_val),
+                        "is_tie": abs(diff_val) < 1e-4,
                     }
                     break
         else:
-            best_s, best_c = scores[0]
-            c_col = chr(ord("A") + (best_c % 5))
-            c_row = (best_c // 5) + 1
+            rec_score = next((s for s, c in scores if c == rec), scores[0][0])
+            c_col = chr(ord("A") + (rec % 5))
+            c_row = (rec // 5) + 1
+            diff_val = round(rec_score - target_total_score, 4)
             runner_up = {
-                "cell": int(best_c),
+                "cell": int(rec),
                 "label": f"{c_col}{c_row}",
-                "total_ev": round(best_s, 2),
-                "diff": round(best_s - target_total_score, 2),
+                "total_ev": round(rec_score, 4),
+                "diff": max(0.0, diff_val),
+                "is_tie": abs(diff_val) < 1e-4,
             }
     
     return {

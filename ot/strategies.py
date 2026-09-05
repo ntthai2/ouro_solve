@@ -95,6 +95,7 @@ class OTInfoGainStrategy:
         self.name = f"Optimized_VOI(lam={lam:.2f}, {n_samples} MC)"
         
     def __call__(self, belief, remaining: List[int]) -> int:
+        remaining = sorted(list(remaining))
         # Move 1: Pinned C3
         if len(belief.revealed) == 0:
             return 12
@@ -109,18 +110,19 @@ class OTInfoGainStrategy:
 
         # Phase 1: Certain safe cells (deterministic, most informative first)
         safe_cells = belief.certain_safe_cells()
-        valid_safe = [c for c in safe_cells if c in remaining]
+        valid_safe = sorted([c for c in safe_cells if c in remaining])
         
         if valid_safe:
-            return max(valid_safe, key=lambda c: _score_safe_cell(belief, c))
+            return max(valid_safe, key=lambda c: (_score_safe_cell(belief, c), -c))
             
         # Phase 2: Posterior probabilities
         probs = belief.p_color_all(use_exact_endgame=self.use_exact_endgame, n_samples=self.n_samples)
         
         # Prioritize joint-safe cells (P(Blue) == 0.0) across combinations
-        zero_risk_cells = [c for c in remaining if probs[COLOR_BLUE][c] == 0.0]
+        zero_risk_cells = sorted([c for c in remaining if probs[COLOR_BLUE][c] == 0.0])
         if zero_risk_cells:
-            best_c, best_s = -1, -float('inf')
+            best_c = -1
+            best_full_s = (-float('inf'), -1, -1, -100, -100)
             for c in zero_risk_cells:
                 e_info = 0.0
                 for col_id, p_list in probs.items():
@@ -129,9 +131,9 @@ class OTInfoGainStrategy:
                         v_ns = [s for s in nb.certain_safe_cells() if s in remaining and s != c]
                         e_info += p_list[c] * len(v_ns)
                 tie = _score_safe_cell(belief, c)
-                total_s = (e_info, tie[0], tie[1], tie[2])
-                if total_s > (best_s, -1, -1, -100):
-                    best_s = e_info
+                total_s = (round(e_info, 9), tie[0], tie[1], tie[2], -c)
+                if total_s > best_full_s:
+                    best_full_s = total_s
                     best_c = c
             return best_c
             
@@ -149,7 +151,7 @@ class OTInfoGainStrategy:
             s1 = -self.lam * p_b + (1.0 - self.lam) * e_info
             step1_scores.append((s1, c))
             
-        step1_scores.sort(key=lambda x: x[0], reverse=True)
+        step1_scores.sort(key=lambda x: (round(x[0], 9), -x[1]), reverse=True)
         
         # Dynamic K-prune: In endgame (<=10 unrevealed), enable 2-step lookahead (takes <30ms)
         active_k_prune = 3 if unrev <= 10 else self.k_prune
@@ -162,6 +164,7 @@ class OTInfoGainStrategy:
         top_k = [c for _, c in step1_scores[:active_k_prune]]
         best_c = top_k[0]
         best_2step = -float('inf')
+        best_full_score = (-float('inf'), -1, -1, -100, -100)
         
         for c in top_k:
             p_b = probs[COLOR_BLUE][c]
@@ -185,9 +188,10 @@ class OTInfoGainStrategy:
                             
             tot_2step = imm_hazard + (1.0 - self.lam) * future_val
             tie = _score_safe_cell(belief, c)
-            full_score = (tot_2step, tie[0], tie[1], tie[2])
+            full_score = (round(tot_2step, 9), tie[0], tie[1], tie[2], -c)
             
-            if full_score > (best_2step, -1, -1, -100):
+            if full_score > best_full_score:
+                best_full_score = full_score
                 best_2step = tot_2step
                 best_c = c
                 

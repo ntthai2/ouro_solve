@@ -110,11 +110,11 @@ class OQExactPOMDP:
 
         best_value = -1.0
         best_cell = -1
-        unclicked = list(belief.unclicked())
+        unclicked = sorted(list(belief.unclicked()))
 
         for cell in unclicked:
             ev = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
@@ -129,7 +129,7 @@ class OQExactPOMDP:
 
                 ev += p * (reward + future)
 
-            if ev > best_value:
+            if ev > best_value + 1e-9:
                 best_value = ev
                 best_cell = cell
 
@@ -149,7 +149,7 @@ class OQExactPOMDP:
 
         cell = self._policy_memo.get(pkey, -1)
         if cell == -1 or cell in belief.revealed:
-            unclicked = list(belief.unclicked())
+            unclicked = sorted(list(belief.unclicked()))
             return unclicked[0] if unclicked else 0
         return cell
 
@@ -179,8 +179,10 @@ class OQVOIGreedy:
         self._value_memo: Dict[Tuple, float] = {}
         self._policy_memo: Dict[Tuple, int] = {}
 
-    def _vkey(self, belief: OQFullBeliefState, clicks_left: int) -> Tuple:
-        return (belief.key(), clicks_left)
+    def _vkey(self, belief: OQFullBeliefState, clicks_left: int, remaining_depth: int = None) -> Tuple:
+        if remaining_depth is None:
+            return (belief.key(), clicks_left)
+        return (belief.key(), clicks_left, remaining_depth)
 
     def _pkey(self, belief: OQFullBeliefState, clicks_left: int) -> Tuple:
         return (belief.key(), belief.revealed, clicks_left)
@@ -200,7 +202,7 @@ class OQVOIGreedy:
         if target is not None:
             return float(COLOR_VALUES[COLOR_RED])
 
-        unclicked = list(belief.unclicked())
+        unclicked = sorted(list(belief.unclicked()))
         if not unclicked:
             return 0.0
 
@@ -222,18 +224,22 @@ class OQVOIGreedy:
         if current_depth >= self.depth:
             return self._approx_future(belief, clicks_left)
 
-        vkey = self._vkey(belief, clicks_left)
+        remaining_depth = self.depth - current_depth
+        vkey_d = self._vkey(belief, clicks_left, remaining_depth)
+        vkey_legacy = self._vkey(belief, clicks_left)
         pkey = self._pkey(belief, clicks_left)
 
-        if vkey in self._value_memo and pkey in self._policy_memo:
-            return self._value_memo[vkey]
+        if vkey_d in self._value_memo and pkey in self._policy_memo:
+            return self._value_memo[vkey_d]
+        if vkey_legacy in self._value_memo and pkey in self._policy_memo:
+            return self._value_memo[vkey_legacy]
 
-        best_value = 0.0
+        best_value = -1.0
         best_cell = -1
 
-        for cell in belief.unclicked():
+        for cell in sorted(list(belief.unclicked())):
             ev = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
@@ -248,11 +254,12 @@ class OQVOIGreedy:
 
                 ev += p * (reward + future)
 
-            if ev > best_value:
+            if ev > best_value + 1e-9:
                 best_value = ev
                 best_cell = cell
 
-        self._value_memo[vkey] = best_value
+        self._value_memo[vkey_d] = best_value
+        self._value_memo[vkey_legacy] = best_value
         self._policy_memo[pkey] = best_cell
         return best_value
 
@@ -270,8 +277,8 @@ class OQVOIGreedy:
 
         visited.add(key)
 
-        for cell in belief.unclicked():
-            for color in belief.possible_colors(cell):
+        for cell in sorted(list(belief.unclicked())):
+            for color in sorted(belief.possible_colors(cell)):
                 new_belief = belief.update(cell, color)
                 if color == COLOR_PURPLE:
                     self.count_states(new_belief, clicks_left, visited)
@@ -301,9 +308,9 @@ class OQVOIGreedy:
         purples_found = len(belief.purple_candidates() & belief.revealed)
         best_cell = -1
         best_ev = -1.0
-        for cell in belief.unclicked():
+        for cell in sorted(list(belief.unclicked())):
             ev = 0.0
-            for color in belief.possible_colors(cell):
+            for color in sorted(belief.possible_colors(cell)):
                 p = belief.p_color(cell, color)
                 if p == 0.0:
                     continue
@@ -312,13 +319,13 @@ class OQVOIGreedy:
                     ev += p * (COLOR_VALUES[COLOR_PURPLE] + bonus)
                 else:
                     ev += p * self._effective_reward(cell, color, belief)
-            if ev > best_ev:
+            if ev > best_ev + 1e-9:
                 best_ev = ev
                 best_cell = cell
 
         if best_cell != -1:
             return best_cell
-        unclicked = list(belief.unclicked())
+        unclicked = sorted(list(belief.unclicked()))
         return unclicked[0] if unclicked else 0
 
 

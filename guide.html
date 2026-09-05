@@ -1322,6 +1322,7 @@
       `;
         } else if (c.state === 'center') {
           div.innerHTML = `<div class="cell-label">${label}</div>`;
+          div.onclick = () => selectCell(c.index);
         } else if (c.state === 'recommended') {
           div.innerHTML = `<div class="cell-label">${label}</div>`;
           div.onclick = () => selectCell(c.index);
@@ -1477,9 +1478,17 @@
       const runnerUpText = document.getElementById('runnerUpText');
       if (d.runner_up) {
         if (d.is_recommended) {
-          runnerUpText.innerHTML = `This move leads runner-up <span class="runner-up-highlight">${d.runner_up.label}</span> (${d.runner_up.total_ev} pts) by <span style="color:#3dcba8; font-weight:700">+${d.runner_up.diff} pts</span>.`;
+          if (d.runner_up.is_tie) {
+            runnerUpText.innerHTML = `Co-optimal move tied with <span class="runner-up-highlight">${d.runner_up.label}</span> (${d.runner_up.total_ev} pts) due to grid symmetry.`;
+          } else {
+            runnerUpText.innerHTML = `This move leads runner-up <span class="runner-up-highlight">${d.runner_up.label}</span> (${d.runner_up.total_ev} pts) by <span style="color:#3dcba8; font-weight:700">+${d.runner_up.diff} pts</span>.`;
+          }
         } else {
-          runnerUpText.innerHTML = `Best move is <span class="runner-up-highlight">${labelOf(d.recommended)}</span>. Choosing <span class="runner-up-highlight">${d.cell_label}</span> costs <span style="color:#e24b4a; font-weight:700">-${d.runner_up.diff} pts</span> in total EV.`;
+          if (d.runner_up.is_tie) {
+            runnerUpText.innerHTML = `Strategically equivalent to <span class="runner-up-highlight">${labelOf(d.recommended)}</span> (${d.runner_up.total_ev} pts) due to grid symmetry.`;
+          } else {
+            runnerUpText.innerHTML = `Best move is <span class="runner-up-highlight">${labelOf(d.recommended)}</span>. Choosing <span class="runner-up-highlight">${d.cell_label}</span> costs <span style="color:#e24b4a; font-weight:700">-${d.runner_up.diff} pts</span> in total EV.`;
+          }
         }
       } else {
         runnerUpText.innerHTML = `Optimal move in current belief state.`;

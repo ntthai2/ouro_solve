@@ -6,6 +6,7 @@ OT Belief State with constraint propagation and Monte Carlo probability estimati
 
 from typing import Dict, List, Tuple, Set, Optional
 import random
+import hashlib
 from collections import defaultdict
 
 from ot.board_generator import (
@@ -16,29 +17,40 @@ from ot.board_generator import (
     enumerate_line_placements
 )
 
-def _sample_rares_subset(pool: List[int], k: int) -> List[int]:
+def _deterministic_seed(revealed: Optional[Dict[int, int]]) -> int:
+    """Generate a stable deterministic seed from the revealed cell-color mapping."""
+    if not revealed:
+        return 42
+    rev_tuple = tuple(sorted(revealed.items()))
+    return int(hashlib.md5(repr(rev_tuple).encode("utf-8")).hexdigest()[:8], 16)
+
+def _sample_rares_subset(pool: List[int], k: int, rng: Optional[random.Random] = None) -> List[int]:
     """Sample k distinct rare colors from pool using weighted sampling without replacement."""
     if k <= 0 or not pool:
         return []
+    if rng is None:
+        rng = random
     p_pool = list(pool)
     weights = [RARE_COLOR_WEIGHTS.get(c, 1.0) for c in p_pool]
     chosen = []
     for _ in range(min(k, len(p_pool))):
         total_w = sum(weights)
         if total_w <= 0:
-            selected = random.choice(p_pool)
+            selected = rng.choice(p_pool)
         else:
-            selected = random.choices(p_pool, weights=weights, k=1)[0]
+            selected = rng.choices(p_pool, weights=weights, k=1)[0]
         idx = p_pool.index(selected)
         p_pool.pop(idx)
         weights.pop(idx)
         chosen.append(selected)
     return chosen
 
-def _sample_n_extra(num_must: int, max_avail: int) -> int:
+def _sample_n_extra(num_must: int, max_avail: int, rng: Optional[random.Random] = None) -> int:
     """Sample number of additional rare colors given number of already confirmed rare colors."""
     if max_avail <= 0:
         return 0
+    if rng is None:
+        rng = random
     if num_must == 0:
         choices = [1, 2]
         weights = [M_PROBABILITIES[0], M_PROBABILITIES[1]]
@@ -51,7 +63,7 @@ def _sample_n_extra(num_must: int, max_avail: int) -> int:
     if not valid:
         return 0
     c_list, w_list = zip(*valid)
-    return random.choices(c_list, weights=w_list, k=1)[0]
+    return rng.choices(c_list, weights=w_list, k=1)[0]
 
 def _subset_prior_weight(subset_rares: Set[int]) -> float:
     """Compute relative prior weight of a specific combination of rare colors."""
@@ -230,6 +242,7 @@ class OTBeliefState:
         base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
         blue_counts = [0] * NUM_CELLS
         successes = 0
+        rng = random.Random(_deterministic_seed(self.revealed))
         
         masks = {
             c: [(sum(1<<x for x in p), p) for p in self.candidate_placements.get(c, [])]
@@ -253,8 +266,8 @@ class OTBeliefState:
             if min_extra > max_extra:
                 continue
                 
-            n_extra = _sample_n_extra(num_must, max_extra)
-            chosen_extra = _sample_rares_subset(optional_rares, n_extra)
+            n_extra = _sample_n_extra(num_must, max_extra, rng=rng)
+            chosen_extra = _sample_rares_subset(optional_rares, n_extra, rng=rng)
             
             active_this_sample = base_colors + list(must_have & set(RARE_COLORS)) + chosen_extra
             
@@ -265,7 +278,7 @@ class OTBeliefState:
                 if not valid_p:
                     fail = True
                     break
-                chosen_mask = random.choice(valid_p)
+                chosen_mask = rng.choice(valid_p)
                 used_mask |= chosen_mask
                 
             if not fail:
@@ -306,6 +319,7 @@ class OTBeliefState:
         base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
         color_counts = defaultdict(lambda: [0] * NUM_CELLS)
         successes = 0
+        rng = random.Random(_deterministic_seed(self.revealed))
         
         masks = {
             c: [(sum(1<<x for x in p), p) for p in self.candidate_placements.get(c, [])]
@@ -329,8 +343,8 @@ class OTBeliefState:
             if min_extra > max_extra:
                 continue
                 
-            n_extra = _sample_n_extra(num_must, max_extra)
-            chosen_extra = _sample_rares_subset(optional_rares, n_extra)
+            n_extra = _sample_n_extra(num_must, max_extra, rng=rng)
+            chosen_extra = _sample_rares_subset(optional_rares, n_extra, rng=rng)
             
             active_this_sample = base_colors + list(must_have & set(RARE_COLORS)) + chosen_extra
             
@@ -342,7 +356,7 @@ class OTBeliefState:
                 if not valid_p:
                     fail = True
                     break
-                chosen_mask = random.choice(valid_p)
+                chosen_mask = rng.choice(valid_p)
                 used_mask |= chosen_mask
                 # Find which cells this covers
                 # masks[c] has (m, p)
