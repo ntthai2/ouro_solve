@@ -477,7 +477,7 @@ def explain_oc(belief, clicks_left, target_cell=None):
 
     unclicked = sorted(list(belief.unclicked()))
     if cell not in unclicked and unclicked:
-        cell = unclicked[0]
+        cell = rec if (rec is not None and rec in unclicked) else unclicked[0]
 
     scores = []
     for c in unclicked:
@@ -611,7 +611,7 @@ def explain_oq(game: OQGame, target_cell=None):
 
     unclicked = sorted(list(belief.unclicked()))
     if cell not in unclicked and unclicked:
-        cell = unclicked[0]
+        cell = rec if (rec is not None and rec in unclicked) else unclicked[0]
 
     pkey = oq_policy._pkey(belief, clicks_left)
     in_policy_cache = pkey in oq_policy._policy_memo
@@ -742,7 +742,7 @@ def explain_ot(game: OTGame, target_cell=None):
     
     remaining = sorted([c for c in range(OT_NUM_CELLS) if c not in game.clicked_cells])
     if cell not in remaining and remaining:
-        cell = remaining[0]
+        cell = rec if (rec is not None and rec in remaining) else remaining[0]
         
     probs = belief.p_color_all(use_exact_endgame=ot_policy.use_exact_endgame, n_samples=ot_policy.n_samples)
     p_blue = probs[OT_COLOR_BLUE][cell]

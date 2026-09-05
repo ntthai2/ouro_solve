@@ -1222,7 +1222,9 @@
       const titleEl = document.getElementById('inputTitle');
       if (!titleEl) return;
       if (pendingCell !== null) {
-        titleEl.innerHTML = `Reveal for <span style="color:#fff;font-weight:700">${labelOf(pendingCell)}</span>`;
+        const isRec = (state && !state.done && pendingCell === state.recommended);
+        titleEl.innerHTML = `Reveal for <span style="color:#fff;font-weight:700">${labelOf(pendingCell)}</span>` +
+          (isRec ? ` <span style="font-size:10px;color:#8bb2ff;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">(Recommended)</span>` : '');
       } else if (state && !state.done && state.recommended !== null && state.recommended !== undefined) {
         titleEl.innerHTML = `Reveal for <span style="color:#fff;font-weight:700">${labelOf(state.recommended)}</span> <span style="font-size:10px;color:#8bb2ff;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">(Recommended)</span>`;
       } else {
@@ -1262,6 +1264,7 @@
 
         pendingCell = null;
         selectedColor = null;
+        currentExplainCell = null;
         document.querySelectorAll('.color-btn').forEach((b) => b.classList.remove('selected'));
         document.getElementById('submitBtn').disabled = true;
 
@@ -1281,6 +1284,18 @@
       const cellObj = state.cells.find(c => c.index === idx);
       if (cellObj && cellObj.certain_color !== undefined && cellObj.certain_color >= 0) {
         submitDirectReveal(idx, cellObj.certain_color);
+        return;
+      }
+
+      // If clicking already selected pending cell, toggle off back to recommended
+      if (pendingCell === idx) {
+        pendingCell = null;
+        buildGrid(state.cells);
+        updateInputTitle();
+        document.getElementById('submitBtn').disabled = true;
+        if (state.recommended !== null && state.recommended !== undefined) {
+          loadExplanation(state.recommended);
+        }
         return;
       }
 
@@ -1401,16 +1416,19 @@
       }
     }
 
+    let explainReqSeq = 0;
     async function loadExplanation(cellIdx) {
       if (!state || state.done) return;
       const explainPanel = document.getElementById('explainPanel');
       if (!explainPanel) return;
 
+      const currentSeq = ++explainReqSeq;
       try {
         const cellParam = (cellIdx !== undefined && cellIdx !== null) ? `&cell=${cellIdx}` : '';
         const res = await fetch(`${API}/explain?mode=${currentMode}${cellParam}`);
-        if (!res.ok) return;
+        if (!res.ok || currentSeq !== explainReqSeq) return;
         const data = await res.json();
+        if (currentSeq !== explainReqSeq) return;
         renderExplanation(data);
       } catch (_) { }
     }
@@ -1503,8 +1521,8 @@
       buildGrid(s.cells);
       updateInputTitle();
       if (!s.done) {
-        const targetExplain = (pendingCell !== null) ? pendingCell : (currentExplainCell !== null ? currentExplainCell : s.recommended);
-        if (targetExplain !== null) {
+        const targetExplain = (pendingCell !== null) ? pendingCell : s.recommended;
+        if (targetExplain !== null && targetExplain !== undefined) {
           loadExplanation(targetExplain);
         }
       }
@@ -1549,6 +1567,7 @@
 
         pendingCell = null;
         selectedColor = null;
+        currentExplainCell = null;
         document.querySelectorAll('.color-btn').forEach((b) => b.classList.remove('selected'));
         document.getElementById('submitBtn').disabled = true;
 
