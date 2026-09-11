@@ -4,7 +4,7 @@ simulation.py
 Simulation runner for OT mode.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import time
 import random
 import numpy as np
@@ -88,15 +88,39 @@ def sample_value(color: int) -> int:
     else:
         return COLOR_VALUES[color]
 
-def run_game_ot(board: np.ndarray, strategy) -> Dict[str, Any]:
-    belief = OTBeliefState()
+def run_game_ot(board: np.ndarray, strategy, num_colors: Optional[int] = None, blind_prior: bool = False) -> Dict[str, Any]:
+    if blind_prior:
+        belief = OTBeliefState(num_rares=None)
+    else:
+        if num_colors is None:
+            # Infer from board: number of unique colors present
+            num_colors = len(np.unique(board))
+        num_rares = max(1, num_colors - 5)
+        belief = OTBeliefState(num_rares=num_rares)
     score = 0
     blue_clicks = 0
     clicked = set()
     clicks = []
     unrevealed_when_lost = -1
     
+    total_non_blue = 25 - int(np.sum(board == COLOR_BLUE))
+    cleared_non_blue = 0
+    
     while blue_clicks < MAX_BLUE_CLICKS:
+        if cleared_non_blue == total_non_blue:
+            # WIN! All non-blue cells cleared. Harvest remaining blues safely up to 4 clicks!
+            while blue_clicks < MAX_BLUE_CLICKS:
+                remaining_blues = [c for c in range(NUM_CELLS) if c not in clicked]
+                if not remaining_blues:
+                    break
+                c_blue = remaining_blues[0]
+                clicked.add(c_blue)
+                blue_clicks += 1
+                reward = COLOR_VALUES[COLOR_BLUE]
+                score += reward
+                clicks.append((c_blue, COLOR_BLUE, reward, False))
+            break
+
         remaining = [c for c in range(NUM_CELLS) if c not in clicked]
         if not remaining:
             break
@@ -118,11 +142,10 @@ def run_game_ot(board: np.ndarray, strategy) -> Dict[str, Any]:
             
         reward = sample_value(color)
         score += reward
+        cleared_non_blue += 1
         belief = belief.update(cell, color)
         clicks.append((cell, color, reward, True))
         
-    total_non_blue = 25 - np.sum(board == COLOR_BLUE)
-    cleared_non_blue = len(clicked) - blue_clicks
     win = (cleared_non_blue == total_non_blue)
     
     return {

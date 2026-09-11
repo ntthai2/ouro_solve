@@ -101,8 +101,13 @@ def _sample_n_extra(num_must: int, max_avail: int, rng: Optional[random.Random] 
     c_list, w_list = zip(*valid)
     return rng.choices(c_list, weights=w_list, k=1)[0]
 
-def _subset_prior_weight(subset_rares: Set[int]) -> float:
+def _subset_prior_weight(subset_rares: Set[int], fixed_rares: bool = False) -> float:
     """Compute relative prior weight of a specific combination of rare colors."""
+    w_colors = 1.0
+    for c in subset_rares:
+        w_colors *= RARE_COLOR_WEIGHTS.get(c, 1.0)
+    if fixed_rares:
+        return w_colors
     m = len(subset_rares)
     if m == 1:
         wm = M_PROBABILITIES[0]
@@ -110,9 +115,6 @@ def _subset_prior_weight(subset_rares: Set[int]) -> float:
         wm = M_PROBABILITIES[1]
     else:
         wm = 1.0
-    w_colors = 1.0
-    for c in subset_rares:
-        w_colors *= RARE_COLOR_WEIGHTS.get(c, 1.0)
     return wm * w_colors
 
 def _cells_from_mask(mask: int) -> Tuple[int, ...]:
@@ -194,10 +196,12 @@ class OTBeliefState:
         _cp_masks: Optional[Dict[int, List[Tuple[int, Tuple[int, ...]]]]] = None,
         rare_active: Optional[Set[int]] = None,
         revealed: Optional[Dict[int, int]] = None,
+        num_rares: Optional[int] = 1,
     ):
         """
         Internal constructor. Normally you'd start with `OTBeliefState()` and call
         `update()` to get child states. `_cp_masks` is the internal masked format.
+        num_rares: Expected number of rare colors on board (1 for 6-color game, 2 for 7-color game).
         """
         if _cp_masks is None:
             # Initial state: build from enumerate_line_placements
@@ -210,6 +214,7 @@ class OTBeliefState:
 
         self.rare_active = set(RARE_COLORS) if rare_active is None else set(rare_active)
         self.revealed = {} if revealed is None else dict(revealed)
+        self.num_rares = num_rares
 
     @property
     def candidate_placements(self) -> Dict[int, List[Tuple[int, ...]]]:
@@ -251,6 +256,15 @@ class OTBeliefState:
                 new_rare_active.discard(rare)
                 new_cp.pop(rare, None)
 
+        # Instant rare color deduction when num_rares is known:
+        # If we have reached the exact quota of rare colors, all other rares are impossible!
+        revealed_rares = {c for c in new_revealed.values() if c in RARE_COLORS}
+        if self.num_rares is not None and len(revealed_rares) >= self.num_rares:
+            for rare in list(new_rare_active):
+                if rare not in revealed_rares:
+                    new_rare_active.discard(rare)
+                    new_cp.pop(rare, None)
+
         # Constraint propagation loop (naked singles) — bitmask accelerated
         changed = True
         while changed:
@@ -278,7 +292,7 @@ class OTBeliefState:
                     new_cp.pop(rare, None)
                     changed = True
 
-        return OTBeliefState(new_cp, new_rare_active, new_revealed)
+        return OTBeliefState(new_cp, new_rare_active, new_revealed, num_rares=self.num_rares)
 
     # ── Certain Safe Cells ────────────────────────────────────────────────────
 
@@ -296,6 +310,16 @@ class OTBeliefState:
         for c in self.revealed.values():
             if c in RARE_COLORS:
                 definitely_active.add(c)
+
+        # Deduction: If num_rares is known and remaining candidate rares exactly equals needed rares
+        # (e.g. 1 rare needed and only 1 rare has valid placements left -> it MUST be active!)
+        if self.num_rares is not None:
+            revealed_rares = {c for c in self.revealed.values() if c in RARE_COLORS}
+            unrevealed_needed = self.num_rares - len(revealed_rares)
+            unrevealed_candidates = self.rare_active - revealed_rares
+            if unrevealed_needed > 0 and len(unrevealed_candidates) == unrevealed_needed:
+                for c in unrevealed_candidates:
+                    definitely_active.add(c)
 
         for c in definitely_active:
             placements = self._cp_masks.get(c)
@@ -335,7 +359,8 @@ class OTBeliefState:
             else:
                 unrevealed.append(c)
 
-        if use_exact_endgame and len(unrevealed) <= 16:
+        exact_threshold = 18 if (self.num_rares == 1) else 16
+        if use_exact_endgame and len(unrevealed) <= exact_threshold:
             return self._p_blue_exact(probs, unrevealed)
 
         base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
@@ -358,14 +383,19 @@ class OTBeliefState:
 
             optional_rares = list(self.rare_active - must_have)
             num_must = len(must_have & set(RARE_COLORS))
-            min_extra = max(0, 1 - num_must)
-            max_extra = min(len(optional_rares), 2 - num_must)
 
-            if min_extra > max_extra:
-                continue
-
-            n_extra = _sample_n_extra(num_must, max_extra, rng=rng)
-            chosen_extra = _sample_rares_subset(optional_rares, n_extra, rng=rng)
+            if self.num_rares is not None:
+                needed = self.num_rares - num_must
+                if needed < 0 or needed > len(optional_rares):
+                    continue
+                chosen_extra = _sample_rares_subset(optional_rares, needed, rng=rng)
+            else:
+                min_extra = max(0, 1 - num_must)
+                max_extra = min(len(optional_rares), 2 - num_must)
+                if min_extra > max_extra:
+                    continue
+                n_extra = _sample_n_extra(num_must, max_extra, rng=rng)
+                chosen_extra = _sample_rares_subset(optional_rares, n_extra, rng=rng)
 
             active_this_sample = base_colors + list(must_have & set(RARE_COLORS)) + chosen_extra
 
@@ -411,7 +441,8 @@ class OTBeliefState:
             else:
                 unrevealed.append(c)
 
-        if use_exact_endgame and len(unrevealed) <= 16:
+        exact_threshold = 18 if (self.num_rares == 1) else 16
+        if use_exact_endgame and len(unrevealed) <= exact_threshold:
             return self._p_color_exact(probs, unrevealed)
 
         base_colors = [COLOR_TEAL, COLOR_GREEN, COLOR_YELLOW, COLOR_ORANGE]
@@ -434,14 +465,19 @@ class OTBeliefState:
 
             optional_rares = list(self.rare_active - must_have)
             num_must = len(must_have & set(RARE_COLORS))
-            min_extra = max(0, 1 - num_must)
-            max_extra = min(len(optional_rares), 2 - num_must)
 
-            if min_extra > max_extra:
-                continue
-
-            n_extra = _sample_n_extra(num_must, max_extra, rng=rng)
-            chosen_extra = _sample_rares_subset(optional_rares, n_extra, rng=rng)
+            if self.num_rares is not None:
+                needed = self.num_rares - num_must
+                if needed < 0 or needed > len(optional_rares):
+                    continue
+                chosen_extra = _sample_rares_subset(optional_rares, needed, rng=rng)
+            else:
+                min_extra = max(0, 1 - num_must)
+                max_extra = min(len(optional_rares), 2 - num_must)
+                if min_extra > max_extra:
+                    continue
+                n_extra = _sample_n_extra(num_must, max_extra, rng=rng)
+                chosen_extra = _sample_rares_subset(optional_rares, n_extra, rng=rng)
 
             active_this_sample = base_colors + list(must_have & set(RARE_COLORS)) + chosen_extra
 
@@ -492,8 +528,6 @@ class OTBeliefState:
 
         optional_rares = list(self.rare_active - must_have)
         num_must = len(must_have & set(RARE_COLORS))
-        min_extra = max(0, 1 - num_must)
-        max_extra = min(len(optional_rares), 2 - num_must)
 
         # Use _cp_masks directly — no recomputation
         masks_dict = {c: self._cp_masks[c] for c in base_colors + list(self.rare_active) if c in self._cp_masks}
@@ -503,16 +537,25 @@ class OTBeliefState:
 
         from itertools import combinations
         valid_subsets = []
-        for n_extra in range(min_extra, max_extra + 1):
-            for extra in combinations(optional_rares, n_extra):
-                subset = base_colors + list(must_have & set(RARE_COLORS)) + list(extra)
-                valid_subsets.append(subset)
+        if self.num_rares is not None:
+            needed = self.num_rares - num_must
+            if 0 <= needed <= len(optional_rares):
+                for extra in combinations(optional_rares, needed):
+                    subset = base_colors + list(must_have & set(RARE_COLORS)) + list(extra)
+                    valid_subsets.append(subset)
+        else:
+            min_extra = max(0, 1 - num_must)
+            max_extra = min(len(optional_rares), 2 - num_must)
+            for n_extra in range(min_extra, max_extra + 1):
+                for extra in combinations(optional_rares, n_extra):
+                    subset = base_colors + list(must_have & set(RARE_COLORS)) + list(extra)
+                    valid_subsets.append(subset)
 
         for subset in valid_subsets:
             if not all(c in masks_dict for c in subset):
                 continue
             rares_in_subset = set(subset) & (set(RARE_COLORS) | self.rare_active)
-            w_prior = _subset_prior_weight(rares_in_subset)
+            w_prior = _subset_prior_weight(rares_in_subset, fixed_rares=(self.num_rares is not None))
             ways, marginals = counter.count(subset, masks_dict, 0)
             if ways > 0:
                 weighted_ways = ways * w_prior
@@ -544,8 +587,6 @@ class OTBeliefState:
 
         optional_rares = list(self.rare_active - must_have)
         num_must = len(must_have & set(RARE_COLORS))
-        min_extra = max(0, 1 - num_must)
-        max_extra = min(len(optional_rares), 2 - num_must)
 
         # Use _cp_masks directly — no recomputation
         masks_dict = {c: self._cp_masks[c] for c in base_colors + list(self.rare_active) if c in self._cp_masks}
@@ -555,16 +596,25 @@ class OTBeliefState:
 
         from itertools import combinations
         valid_subsets = []
-        for n_extra in range(min_extra, max_extra + 1):
-            for extra in combinations(optional_rares, n_extra):
-                subset = base_colors + list(must_have & set(RARE_COLORS)) + list(extra)
-                valid_subsets.append(subset)
+        if self.num_rares is not None:
+            needed = self.num_rares - num_must
+            if 0 <= needed <= len(optional_rares):
+                for extra in combinations(optional_rares, needed):
+                    subset = base_colors + list(must_have & set(RARE_COLORS)) + list(extra)
+                    valid_subsets.append(subset)
+        else:
+            min_extra = max(0, 1 - num_must)
+            max_extra = min(len(optional_rares), 2 - num_must)
+            for n_extra in range(min_extra, max_extra + 1):
+                for extra in combinations(optional_rares, n_extra):
+                    subset = base_colors + list(must_have & set(RARE_COLORS)) + list(extra)
+                    valid_subsets.append(subset)
 
         for subset in valid_subsets:
             if not all(c in masks_dict for c in subset):
                 continue
             rares_in_subset = set(subset) & (set(RARE_COLORS) | self.rare_active)
-            w_prior = _subset_prior_weight(rares_in_subset)
+            w_prior = _subset_prior_weight(rares_in_subset, fixed_rares=(self.num_rares is not None))
             ways, marginals = counter.count(subset, masks_dict, 0)
             if ways > 0:
                 weighted_ways = ways * w_prior

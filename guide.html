@@ -421,19 +421,25 @@
     }
 
     @keyframes pulse {
-      0%, 100% {
+
+      0%,
+      100% {
         box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15);
       }
+
       50% {
         box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.25);
       }
     }
 
     @keyframes conversionPulse {
-      0%, 100% {
+
+      0%,
+      100% {
         box-shadow: 0 0 0 3px rgba(255, 80, 80, 0.28);
         transform: scale(1);
       }
+
       50% {
         box-shadow: 0 0 0 8px rgba(255, 80, 80, 0.45);
         transform: scale(1.03);
@@ -575,8 +581,8 @@
     }
 
     .color-8 {
-      background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.4) 0%, transparent 60%),
-                  linear-gradient(135deg, #d87d8a 0%, #d89b78 20%, #d4b874 40%, #72b8a2 65%, #6a96c7 85%, #9b82c4 100%);
+      background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4) 0%, transparent 60%),
+        linear-gradient(135deg, #d87d8a 0%, #d89b78 20%, #d4b874 40%, #72b8a2 65%, #6a96c7 85%, #9b82c4 100%);
       box-shadow: 0 0 5px rgba(155, 130, 196, 0.3);
       border: 1px solid rgba(255, 255, 255, 0.25);
       color: #ffffff !important;
@@ -1011,12 +1017,24 @@
 <body>
 
   <h1>See<span>Red</span></h1>
-  <p class="subtitle">Unified OC, OQ, and OT assistant. Match your in-game reveal here to get the next recommendation.</p>
+  <p class="subtitle">Unified OC, OQ, and OT assistant. Match your in-game reveal here to get the next recommendation.
+  </p>
 
   <div class="mode-switch" id="modeSwitch">
     <button class="mode-btn active" id="modeOC" onclick="switchMode('oc')">$oc</button>
     <button class="mode-btn" id="modeOQ" onclick="switchMode('oq')">$oq</button>
     <button class="mode-btn" id="modeOT" onclick="switchMode('ot')">$ot</button>
+  </div>
+
+  <div class="ot-config-bar" id="otConfigBar"
+    style="display:none; margin-bottom: 14px; gap: 8px; align-items: center; justify-content: center;">
+    <span
+      style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted-2); letter-spacing: 0.5px;">OT
+      Colors:</span>
+    <div class="mode-switch" style="margin-bottom: 0; padding: 2px;">
+      <button class="mode-btn active" id="ot6ColorsBtn" onclick="setOTColors(6)">6 Colors</button>
+      <button class="mode-btn" id="ot7ColorsBtn" onclick="setOTColors(7)">7 Colors</button>
+    </div>
   </div>
 
   <div class="layout">
@@ -1046,10 +1064,37 @@
     </div>
 
     <div class="panel">
+      <div class="card" id="otStatusCard" style="display:none; margin-bottom: 12px; padding: 12px 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          <span
+            style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--muted-2); letter-spacing: 0.6px;">Non-Blue
+            Clearance</span>
+          <span id="otNonBlueCounter" style="font-size: 12px; font-weight: 700; color: #3dcba8;">0 / 14</span>
+        </div>
+        <div
+          style="width: 100%; height: 6px; background: var(--panel-dark); border-radius: 999px; overflow: hidden; margin-bottom: 8px;">
+          <div id="otProgressBar" style="width: 0%; height: 100%; background: #3dcba8; transition: width 0.2s;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: var(--muted);">
+          <span>Blue Lives Left: <strong id="otBlueLives" style="color:#e24b4a">4 / 4</strong></span>
+          <span id="otRemainingSafeText">Safe Remaining: 14</span>
+        </div>
+      </div>
+
+      <div class="card" id="otWinAlert"
+        style="display:none; margin-bottom: 12px; background: radial-gradient(circle at 50% 50%, rgba(61, 203, 168, 0.2) 0%, rgba(61, 203, 168, 0.05) 100%); border: 1.5px solid #3dcba8; text-align: center; padding: 14px;">
+        <div
+          style="color: #3dcba8; font-weight: 800; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">
+          🎉 ALL NON-BLUE CLEARED!</div>
+        <div style="color: #eee; font-size: 11.5px; margin-top: 5px; line-height: 1.4;">Remaining unrevealed cells are
+          100% Blue. Click safe Blues for up to +40 pts without risk!</div>
+      </div>
+
       <div class="card" id="inputCard">
         <div class="card-title" id="inputTitle" style="text-align:center">What did you reveal?</div>
         <div class="color-picker" id="colorPicker"></div>
-        <button class="submit-btn" id="submitBtn" disabled onclick="submitReveal()" style="display:none">Submit reveal</button>
+        <button class="submit-btn" id="submitBtn" disabled onclick="submitReveal()" style="display:none">Submit
+          reveal</button>
       </div>
 
       <div class="card done-card" id="doneCard" style="display:none">
@@ -1179,6 +1224,26 @@
       document.getElementById('modeOC').classList.toggle('active', currentMode === 'oc');
       document.getElementById('modeOQ').classList.toggle('active', currentMode === 'oq');
       document.getElementById('modeOT').classList.toggle('active', currentMode === 'ot');
+      const otConfig = document.getElementById('otConfigBar');
+      if (otConfig) otConfig.style.display = (currentMode === 'ot') ? 'flex' : 'none';
+    }
+
+    async function setOTColors(numColors) {
+      if (currentMode !== 'ot') return;
+      document.getElementById('ot6ColorsBtn').classList.toggle('active', numColors === 6);
+      document.getElementById('ot7ColorsBtn').classList.toggle('active', numColors === 7);
+      try {
+        const r = await fetch(`${API}/reset?mode=ot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ num_colors: numColors })
+        });
+        const s = await r.json();
+        render(s);
+        setStatus(true);
+      } catch (_) {
+        setStatus(false);
+      }
     }
 
     function buildColorPicker() {
@@ -1471,13 +1536,13 @@
         if (d.mode === 'oc') candLabel = `${item.candidates_left} red cands`;
         else if (d.mode === 'oq') candLabel = `${item.candidates_left} purples`;
         else candLabel = `${item.info_gain_cells} safe cells`;
-        
+
         let rewardText = `+${item.reward} (${item.weighted_reward})`;
         if (d.mode === 'ot') {
-            if (item.color === 0) rewardText = 'Risk (Blue)';
-            else rewardText = `+${item.info_gain_cells} safe cells`;
+          if (item.color === 0) rewardText = 'Risk (Blue)';
+          else rewardText = `+${item.info_gain_cells} safe cells`;
         }
-        
+
         return `
       <tr>
         <td>
@@ -1520,6 +1585,35 @@
       renderDoneCard(s);
       buildGrid(s.cells);
       updateInputTitle();
+
+      const otStatus = document.getElementById('otStatusCard');
+      const otWin = document.getElementById('otWinAlert');
+      if (otStatus && otWin) {
+        if (currentMode === 'ot' && !s.done) {
+          const numColors = s.num_colors || 6;
+          document.getElementById('ot6ColorsBtn').classList.toggle('active', numColors === 6);
+          document.getElementById('ot7ColorsBtn').classList.toggle('active', numColors === 7);
+
+          if (s.all_non_blue_cleared) {
+            otStatus.style.display = 'none';
+            otWin.style.display = 'block';
+          } else {
+            otStatus.style.display = 'block';
+            otWin.style.display = 'none';
+            const cleared = s.cleared_non_blue || 0;
+            const total = s.total_non_blue || 14;
+            const pct = Math.min(100, Math.round((cleared / total) * 100));
+            document.getElementById('otNonBlueCounter').textContent = `${cleared} / ${total}`;
+            document.getElementById('otProgressBar').style.width = `${pct}%`;
+            document.getElementById('otBlueLives').textContent = `${s.max_blue_clicks - s.blue_clicks} / ${s.max_blue_clicks}`;
+            document.getElementById('otRemainingSafeText').textContent = `Safe Remaining: ${total - cleared}`;
+          }
+        } else {
+          otStatus.style.display = 'none';
+          otWin.style.display = 'none';
+        }
+      }
+
       if (!s.done) {
         const targetExplain = (pendingCell !== null) ? pendingCell : s.recommended;
         if (targetExplain !== null && targetExplain !== undefined) {

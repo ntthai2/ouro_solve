@@ -76,13 +76,15 @@ class OTHybridStrategy:
 
 # Optimal Move 2 responses after opening C3 (Cell 12) to eliminate MC noise at Move 2
 MOVE2_OPENING_BOOK = {
-    COLOR_BLUE: 16,   # B4 (safe diagonal reflection)
+    COLOR_BLUE: 16,   # B4 (safe diagonal reflection, p_blue=27.2% vs ~50% orthogonal)
     1: 13,            # Teal -> D3 (orthogonal run extension)
     2: 7,             # Green -> C2 (orthogonal run extension)
     3: 17,            # Yellow -> C4 (orthogonal run extension)
     4: 17,            # Orange -> C4 (orthogonal run extension)
     5: 13,            # White -> D3 (orthogonal extension)
     6: 13,            # Black -> D3 (orthogonal extension)
+    7: 13,            # Red -> D3 (orthogonal extension)
+    8: 13,            # Rainbow -> D3 (orthogonal extension)
 }
 
 

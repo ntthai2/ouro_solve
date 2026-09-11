@@ -341,12 +341,20 @@ class OQGame:
 
 
 class OTGame:
-    def __init__(self):
-        self.reset()
+    def __init__(self, num_colors: int = 6):
+        self.num_colors = num_colors
+        self.reset(num_colors)
 
-    def reset(self):
-        self.belief = OTBeliefState()
+    def reset(self, num_colors: int = None):
+        if num_colors is not None:
+            self.num_colors = num_colors
+        self.num_rares = max(1, self.num_colors - 5)
+        self.total_non_blue = 12 + self.num_rares * 2 # 14 for 6 colors, 16 for 7 colors
+        self.total_blue = OT_NUM_CELLS - self.total_non_blue # 11 for 6 colors, 9 for 7 colors
+        self.belief = OTBeliefState(num_rares=self.num_rares)
         self.blue_clicks = 0
+        self.cleared_non_blue = 0
+        self.all_non_blue_cleared = False
         self.score = 0
         self.done = False
         self.history = []
@@ -376,11 +384,27 @@ class OTGame:
             self.blue_clicks += 1
             if self.blue_clicks >= MAX_BLUE_CLICKS:
                 self.done = True
+        else:
+            self.cleared_non_blue += 1
+            if self.cleared_non_blue >= self.total_non_blue:
+                self.all_non_blue_cleared = True
+                if self.blue_clicks >= MAX_BLUE_CLICKS:
+                    self.done = True
 
     def recommend(self):
         if self.done: return None
         remaining = [c for c in range(OT_NUM_CELLS) if c not in self.clicked_cells]
         if not remaining: return None
+
+        # Harvest Blue Mode: All non-blue cells already cleared!
+        # Remaining cells are guaranteed 100% Blue.
+        # Safe to click up to MAX_BLUE_CLICKS (4) for +10 pts each!
+        if self.all_non_blue_cleared:
+            if self.blue_clicks < MAX_BLUE_CLICKS:
+                return remaining[0]
+            self.done = True
+            return None
+
         # Root opening: C3 (Cell 12) is proven lowest p_blue (~33.2%)
         if len(self.clicked_cells) == 0:
             return 12
@@ -391,6 +415,8 @@ class OTGame:
     def to_dict(self):
         rec = self.recommend()
         safe_cells = list(self.belief.certain_safe_cells())
+        if self.all_non_blue_cleared:
+            safe_cells = [c for c in range(OT_NUM_CELLS) if c not in self.clicked_cells]
         
         revealed_map = {h["cell"]: h for h in self.history}
         cells = []
@@ -421,6 +447,11 @@ class OTGame:
             "score": self.score,
             "blue_clicks": self.blue_clicks,
             "max_blue_clicks": MAX_BLUE_CLICKS,
+            "num_colors": self.num_colors,
+            "num_rares": self.num_rares,
+            "total_non_blue": self.total_non_blue,
+            "cleared_non_blue": self.cleared_non_blue,
+            "all_non_blue_cleared": self.all_non_blue_cleared,
             "done": self.done,
             "recommended": rec,
             "safe_cells": safe_cells,
@@ -743,6 +774,32 @@ def explain_ot(game: OTGame, target_cell=None):
     remaining = sorted([c for c in range(OT_NUM_CELLS) if c not in game.clicked_cells])
     if cell not in remaining and remaining:
         cell = rec if (rec is not None and rec in remaining) else remaining[0]
+
+    col_letter = chr(ord("A") + (cell % 5))
+    row_num = (cell // 5) + 1
+
+    if game.all_non_blue_cleared:
+        breakdown = [{
+            "color": int(OT_COLOR_BLUE),
+            "name": "Blue (Safe +10)",
+            "prob": 1.0,
+            "prob_pct": "100.0%",
+            "info_gain_cells": 0
+        }]
+        return {
+            "mode": "ot",
+            "cell": int(cell),
+            "cell_label": f"{col_letter}{row_num}",
+            "recommended": int(rec) if rec is not None else None,
+            "is_recommended": (cell == rec),
+            "blue_clicks_left": MAX_BLUE_CLICKS - game.blue_clicks,
+            "immediate_p_blue": 1.0,
+            "expected_info_gain": 0.0,
+            "total_score": 10.0,
+            "breakdown": breakdown,
+            "runner_up": None,
+            "all_non_blue_cleared": True,
+        }
         
     probs = belief.p_color_all(use_exact_endgame=ot_policy.use_exact_endgame, n_samples=ot_policy.n_samples)
     p_blue = probs[OT_COLOR_BLUE][cell]
@@ -884,6 +941,15 @@ class Handler(BaseHTTPRequestHandler):
             if game is None:
                 self._send_json({"error": "invalid mode, use oc, oq, or ot"}, 400)
                 return
+            if mode == "ot":
+                colors_param = query.get("colors", [None])[0] or query.get("num_colors", [None])[0]
+                if colors_param is not None and len(ot_game.history) == 0:
+                    try:
+                        nc = int(colors_param)
+                        if nc in (6, 7) and ot_game.num_colors != nc:
+                            ot_game.reset(num_colors=nc)
+                    except ValueError:
+                        pass
             payload = game.to_dict()
             payload["mode"] = mode
             self._send_json(payload)
@@ -922,6 +988,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        query = parse_qs(parsed.query)
         mode = _mode_from_path(self.path)
         game, num_cells, max_color = _game_for_mode(mode)
 
@@ -951,7 +1018,18 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/reset":
-            game.reset()
+            if mode == "ot":
+                nc_raw = body.get("num_colors") or body.get("colors") or query.get("colors", [None])[0] or query.get("num_colors", [None])[0]
+                if nc_raw is not None:
+                    try:
+                        nc = int(nc_raw)
+                        ot_game.reset(num_colors=nc)
+                    except ValueError:
+                        ot_game.reset()
+                else:
+                    ot_game.reset()
+            else:
+                game.reset()
             payload = game.to_dict()
             payload["mode"] = mode
             self._send_json(payload)
