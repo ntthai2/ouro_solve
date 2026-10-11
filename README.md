@@ -127,7 +127,7 @@ Each strategy takes the current belief state (boards consistent with reveals) an
 > State space: **12,650 valid board configurations** ($C(25, 4)$ purple arrangements) under uniform distribution.
 
 ### Q1. Game Rules & Mechanics
-Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3rd Purple instantly exposes the 4th Purple's location, which converts to **Red (150 pts)** and costs 1 paid click. Theoretical maximum: **495 pts** (Red 150 + 3 free purples 15 + 6 paid clicks on Yellow 330).
+Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3rd Purple instantly exposes the 4th Purple's location, which converts to **Red (150 pts)** and costs 1 paid click. Theoretical maximum: **490 pts** (Red 150 + 3 free purples 15 + top 6 non-purple cells: Orange 90 + Yellow×3 165 + Green×2 70 = 325; maximum geometric limit on 5×5 grid with 4 purples).
 
 | Color | Moore Purple Neighbors | Value | Notes |
 |---|---|---|---|
@@ -146,19 +146,19 @@ Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3
    - *Rationale*: Non-purple cells use standard expected color value, while purples are augmented by downstream conversion value. Correctly weights purple exploration against immediate points without requiring intractable 100,000+ state POMDP trees.
 2. **Purple-First Greedy**:
    - *Mechanism*: Purely selects $\arg\max_x P(x = \text{Purple})$ until 3 purples are found, then switches to expected reward.
-   - *Why It Fails*: Costs >53 points and drops P(Red) by 14.7% because it completely ignores the constraint information provided by non-purple Moore counts.
+   - *Why It Fails*: Costs ~52 points and drops P(Red) by 12.2% because it completely ignores the constraint information provided by non-purple Moore counts.
 3. **Oracle (Theoretical Upper Bound)**:
-   - *Mechanism*: Omniscient solver with perfect knowledge of all 4 purples from Click 1. Clicks 3 free purples, 1 converted red, and spends remaining 6 paid clicks on yellow (EV = 376.65). Upper bound only.
+   - *Mechanism*: Omniscient solver with perfect knowledge of all 4 purples from Click 1. Clicks 3 free purples, 1 converted red, and spends remaining 6 paid clicks on top non-purple cells (EV = 376.91). Upper bound only.
 
 ### Q3. Strategy Benchmarks & Statistical Validation
 
 | Strategy | Expected Score (EV) | Score Std | 95% CI [Lower, Upper] | Score Range [Min, Max] | P(Red) | Cache Size | Precompute | Notes |
 |---|---|---|---|---|---|---|---|---|
-| **Oracle Bound** | **376.65** | 34.23 | [376.05, 377.25] | [285, 490] | 100% | — | — | Theoretical ceiling (zero exploration cost) |
-| **VOI d=2 + Cascade [Production]** | **349.32** | 59.84 | [348.28, 350.36] | [130, 490] | **95.7%** | **1.0 MB** | 30 sec | **Global Production Optimum** |
-| VOI d=3 + Cascade (Leaf bonus) | 344.97 | 61.12 | [343.91, 346.03] | [120, 490] | 91.3% | 12.2 MB | 15 min | Slower, no statistical edge ($p=0.135$) |
-| VOI d=1 + Cascade Bonus | 345.51 | 60.45 | [344.46, 346.56] | [140, 490] | 91.0% | 0.1 MB | 1.2 sec | Fast fallback |
-| Purple-First Greedy | 295.94 | 72.30 | [294.68, 297.20] | [80, 490] | 81.0% | None | None | Fails (-53 pts); ignores non-purple info |
+| **Oracle Bound** | **376.91** | 34.23 | [376.32, 377.51] | [285, 490] | 100% | — | — | Theoretical ceiling (zero exploration cost) |
+| **VOI d=2 + Cascade [Production]** | **347.92** | 58.02 | [346.91, 348.93] | [130, 490] | **93.3%** | **1.0 MB** | 30 sec | **Global Production Optimum** |
+| VOI d=3 + Cascade (Leaf bonus) | 344.97 | 61.12 | [343.91, 346.03] | [120, 490] | 91.3% | 12.2 MB | 15 min | Ablation sample ($N=300$), no edge ($p=0.135$) |
+| VOI d=1 + Cascade Bonus | 347.04 | 59.22 | [346.01, 348.07] | [125, 490] | 92.2% | 0.1 MB | 1.2 sec | Fast fallback (-0.88 pt vs d=2) |
+| Purple-First Greedy | 295.94 | 76.15 | [294.61, 297.26] | [80, 490] | 81.1% | None | None | Fails (-52 pts); ignores non-purple info |
 
 - **Statistical Validation (d=2 vs d=3)**: Paired t-test ($N=300$) yields $t = -1.4971, p = 0.1354 > 0.05$. There is no statistical difference between depth 2 and depth 3. Depth 2 is the superior deployment choice: 12x smaller cache (1.0 MB vs 12.2 MB) and faster execution.
 - **Exact Endgame vs Fallback**: Exact endgame branching takes 4.5s–25s per move, while the $O(1)$ cascade bonus matches optimal endgame moves in $>98\%$ of states.
@@ -194,7 +194,7 @@ Player has **7 paid clicks** to find 3 of 4 hidden Purple spheres. Finding the 3
   - **6 Colors ($m_{\text{extra}}=1$, Standard Game)**: 14 Non-Blue cells (Teal 4, Green 3, Yellow 3, Orange 2, Rare 2), **11 Blue cells** ($P(\text{Blue}) = 44.0\%$). $N = 4,779,264$ configs.
   - **7 Colors ($m_{\text{extra}}=2$, Rare Game)**: 16 Non-Blue cells (Base 12 + 2 Rares × 2), **9 Blue cells** ($P(\text{Blue}) = 36.0\%$). $N = 68,074,560$ configs.
   - **Total $N$ = 72,853,824 configurations**.
-- **Empirical Calibration (16 Real Games)**: Prior $P(m_{\text{extra}}=1) = 75\%$, $P(m_{\text{extra}}=2) = 25\%$. Rare split: White (49%), Black (49%), Red (1%), Rainbow (1%).
+- **Empirical Calibration (28 Real Games)**: Prior $P(m_{\text{extra}}=1) = 75\%$, $P(m_{\text{extra}}=2) = 25\%$ (exactly 21/28 vs 7/28). Rare split: White (48.6%), Black (40.0%), Red (5.7%), Rainbow (5.7%).
 
 ### T2. Strategy Architectures & How They Work
 1. **Optimized VOI ($\lambda=0.88$, Production Peak with Color Conditioning)**:
@@ -288,21 +288,21 @@ $$V(\text{belief}, t) = \max_x \sum_c P(x=c \mid \text{belief}) \cdot \left[\tex
 - **State-Seeded Monte Carlo ($ot$)**: For $ot$ configurations with $U \ge 19$ (or $U \ge 17$ in 7-color mode) where exact DP is intractable under latency limits, the 3,500-sample Monte Carlo estimator seeds its PRNG deterministically from the hash of the revealed board state, ensuring 100% reproducible recommendations across repeated evaluations without sacrificing sample diversity across moves.
 - **Server API Synchronization**: `/state` and `/explain` endpoints are strictly synchronized: `/state` recommendation is guaranteed to match the rank-1 move in `/explain`, and runner-up deltas are calculated as $\Delta = \max(0.0, V_{\text{rec}} - V_{\text{runner}})$ with explicit `is_tie: true` signaling for co-optimal symmetries.
 
-### Empirical Validation ($ot$ 18 Real Games)
-- **Rare Distribution (6 vs 7 Colors)**: Across 18 recorded games, $m_{\text{extra}}=1$ (6 colors) appeared in 14 games (77.8%), and $m_{\text{extra}}=2$ (7 colors) in 4 games (22.2%), strongly validating the 75%/25% prior ($p=1.0000$, binomial test).
-- **Rare Color Frequency**: Across 22 rare slots: White (10, 45.5%), Black (10, 45.5%), Red (1, 4.5%), Rainbow (1, 4.5%). Confirms exact 1:1 balance between White and Black, with Red/Rainbow as extreme outliers.
-- **Black Spawn Uniformity**: Across 13 Black clicks, 8 of 9 pool colors were observed (Ra 3, Re 2, W 2, P 2, B 1, G 1, Y 1, O 1, Black never observed). Goodness-of-fit $\chi^2 = 4.31, p = 0.8284 > 0.05$ confirms the uniform $1/9$ distribution.
-- **White Cluster Distribution**: Empirical clusters observed: size=4 (3 times, 50%), size=5 (3 times, 50%), size=3 (0 times). Confirms the calibrated `uniform(4, 5)` implementation.
-- **Live Assistant Performance (SeeRed)**: In the 8 latest recorded games played with live assistant guidance:
-  - **Win Rate**: **25.0%** (vs **27.5%** simulated suite benchmark).
-  - **Non-Blue Clearance**: **82.1%** (92/112 non-blue cells cleared vs **81.4%** simulated suite benchmark).
+### Empirical Validation ($ot$ 28 Real Games)
+- **Rare Distribution (6 vs 7 Colors)**: Across 28 recorded games, $m_{\text{extra}}=1$ (6 colors) appeared in 21 games (75.0%), and $m_{\text{extra}}=2$ (7 colors) in 7 games (25.0%), exactly confirming the 75%/25% prior ($p=1.0000$, binomial test).
+- **Rare Color Frequency**: Across 35 rare slots: White (17, 48.6%), Black (14, 40.0%), Red (2, 5.7%), Rainbow (2, 5.7%). Confirms White and Black dominate (~88.6%), with Red and Rainbow appearing as rare occurrences (~5.7% each).
+- **Black Spawn Uniformity**: Across 18 Black clicks, 8 of 9 pool colors were observed (P 4, Ra 3, W 3, Re 3, Y 1, G 1, O 1, B 1, Black never observed). Confirms Black never spawns Black and samples across the remaining pool colors.
+- **White Cluster Distribution**: Empirical clusters observed: size=4 (7 times, 50.0%), size=5 (7 times, 50.0%), size=3 (0 times), size=6 (0 times). Exactly confirms the calibrated `uniform(4, 5)` discrete implementation.
+- **Live Assistant Performance (SeeRed)**: Across all 18 recorded games played with live assistant guidance:
+  - **Win Rate**: **22.2%** (4/18 wins vs **27.5%** simulated suite benchmark).
+  - **Non-Blue Clearance**: **82.4%** (210/255 non-blue cells cleared vs **81.4%** simulated suite benchmark).
 
 ### Summary Comparison Across Modes
 
 | Mode | Board Configurations | Theoretical Max / Oracle | Production EV | Score Std | 95% CI [Lower, Upper] | Score Range [Min, Max] | P(Goal) | Production Policy | Runtime / Cache |
 |---|---|---|---|---|---|---|---|---|---|
 | **$oc$** | 16,800 | 440 (Red + O×2 + Y×2) | **336.97** | 59.76 | [335.16, 338.79] | [200, 440] | 100% (Red) | VOI depth=3 | < 2 ms (16.6 MB) |
-| **$oq$** | 12,650 | 495 (3 Purple + Red + 6 Yellow) | **349.32** | 59.84 | [348.28, 350.36] | [130, 490] | 95.7% (Red) | VOI depth=2 + Cascade | < 2 ms (1.0 MB) |
+| **$oq$** | 12,650 | 490 (Red + 3 Purple + top 6 cells) | **347.92** | 58.02 | [346.91, 348.93] | [130, 490] | 93.3% (Red) | VOI depth=2 + Cascade | < 2 ms (1.0 MB) |
 | **$ot$** | 72,853,824 | 981 (All non-blue + 4 Blue) | **720.04** | 359.87 | [670.16, 769.92] | [40, 2184] | 27.5% (Win) | Color-Conditioned VOI $\lambda=0.88$ + DP $\le 18$ | ~18 ms (0 MB) |
 
 ---

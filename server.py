@@ -177,7 +177,7 @@ OCGame = GameState
 
 class OQGame:
     MAX_PAID_CLICKS = 7
-    MAX_SCORE = 495
+    MAX_SCORE = 490
 
     def __init__(self):
         self.reset()

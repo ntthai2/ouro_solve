@@ -75,7 +75,7 @@ PLACEMENTS_CACHE = {
     for length in set(RUN_LENGTHS.values())
 }
 
-# Empirical prior weights over m_extra in {1, 2} calibrated from 16 real games (75% 1-rare, 25% 2-rare).
+# Empirical prior weights over m_extra in {1, 2} calibrated from 28 real games (75.0% 1-rare, 25.0% 2-rare: exactly 21 vs 7).
 M_PROBABILITIES = [0.75, 0.25]
 
 def generate_random_board(m_extra: Optional[int] = None) -> Optional[np.ndarray]:
